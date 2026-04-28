@@ -1,84 +1,55 @@
 import streamlit as st
 import pandas as pd
-# ... (mismo código de conexión anterior) ...
-#
-# Carga de datos con los GIDs actualizados
-df_proy_detalle = load_data(1900275728) # ID_CARGA, ID_PROY, ID_ITEM, COMPUTO
+import gspread
+from google.oauth2.service_account import Credentials
 
-st.sidebar.header("Acciones")
-modo = st.sidebar.radio("Ir a:", ["Ver Consolidado", "Cargar Ítems a Proyecto"])
+# 1. Configuración de Conexión (Asegúrate de tener esto en Secrets)
+def get_gsheet_client():
+    scope = ["https://googleapis.com"]
+    # En Streamlit Cloud, pega el JSON en la sección Secrets
+    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
+    return gspread.authorize(creds)
 
-if modo == "Cargar Ítems a Proyecto":
-    st.subheader("Asignar Ítem a Proyecto")
-    with st.form("form_carga"):
-        proj = st.selectbox("Proyecto", df_proyectos['N_PROY'].unique())
-        item = st.selectbox("Ítem/Rubro", df_items['N_ITEM'].unique())
-        cantidad = st.number_input("Cantidad (Cómputo)", min_value=0.1)
-        
-        if st.form_submit_button("Guardar en Sheet"):
-            id_p = df_proyectos[df_proyectos['N_PROY'] == proj]['ID_PROY'].values[0]
-            id_i = df_items[df_items['N_ITEM'] == item]['ID_ITEM'].values[0]
-            
-            # Preparar fila (ID_CARGA puede ser un timestamp o correlativo)
-            nueva_fila = [str(pd.Timestamp.now()), id_p, id_i, cantidad]
-            sh.get_worksheet_by_id(1900275728).append_row(nueva_fila)
-            st.success("¡Datos guardados!")
+# 2. Definición de funciones ANTES de usarlas
+def load_data(gid, sheet_id, client):
+    sh = client.open_by_key(sheet_id)
+    worksheet = sh.get_worksheet_by_id(gid)
+    return pd.DataFrame(worksheet.get_all_records())
 
-elif modo == "Ver Consolidado":
+# --- INICIO DE LA APP ---
+client = get_gsheet_client()
+sheet_id = "12plATZeI3STturtJtMog24m-e-WNGr1KcAOWQRuvVO0"
+
+# Carga de datos inicial
+df_proyectos = load_data(0, sheet_id, client)
+df_materiales = load_data(1931749204, sheet_id, client)
+df_items = load_data(50989702, sheet_id, client)
+df_proy_detalle = load_data(1900275728, sheet_id, client)
+
+st.title("Gestor de Materiales 2026")
+
+# Menú lateral
+modo = st.sidebar.radio("Navegación", ["Ver Consolidado", "Cargar Ítems"])
+
+if modo == "Ver Consolidado":
+    st.header("Consolidado de Proyecto")
     proyecto_sel = st.selectbox("Seleccionar Proyecto", df_proyectos['N_PROY'].unique())
-    id_p_sel = df_proyectos[df_proyectos['N_PROY'] == proyecto_sel]['ID_PROY'].values[0]
-
-    if st.button("Calcular Listado de Materiales"):
-        # 1. Filtrar lo que tiene el proyecto
-        det = df_proy_detalle[df_proy_detalle['ID_PROY'] == id_p_sel]
+    
+    if st.button("Generar Listado"):
+        id_p = df_proyectos.loc[df_proyectos['N_PROY'] == proyecto_sel, 'ID_PROY'].values[0]
         
-        # 2. Unir con la receta de materiales de cada ítem
-        # PROY_DETALLE(COMPUTO) * ITEMS(C_MAT)
+        # Filtrar detalle y calcular
+        det = df_proy_detalle[df_proy_detalle['ID_PROY'] == id_p]
         merged = det.merge(df_items, on='ID_ITEM')
         merged['CANT_TOTAL_MAT'] = merged['COMPUTO'] * merged['C_MAT']
         
-        # 3. Agrupar por material para el listado único
         resumen = merged.groupby('ID_MAT')['CANT_TOTAL_MAT'].sum().reset_index()
-        
-        # 4. Traer info estética (Nombre, Unidad)
         final = resumen.merge(df_materiales, on='ID_MAT')
         
-        st.table(final[['N_MAT', 'CANT_TOTAL_MAT', 'UNIDAD']])
+        st.dataframe(final[['N_MAT', 'CANT_TOTAL_MAT', 'UNIDAD', 'COSTO_UNITARIO']])
 
-
-if modo == "Cargar Ítems a Proyecto":
-    st.subheader("Asignar Ítem a Proyecto")
+elif modo == "Cargar Ítems":
+    st.header("Asignar Ítems")
+    # Aquí iría el formulario de carga que vimos antes
+    st.info("Formulario de carga listo para implementar.")
     
-    with st.form("form_carga"):
-        proj_nom = st.selectbox("Seleccionar Proyecto", df_proyectos['N_PROY'].unique())
-        item_nom = st.selectbox("Seleccionar Ítem/Rubro", df_items['N_ITEM'].unique())
-        cantidad = st.number_input("Cantidad del Ítem (Cómputo)", min_value=0.01, step=0.01)
-        
-        submit = st.form_submit_button("Guardar en Sheet")
-        
-        if submit:
-            # Obtener los IDs correspondientes
-            id_p = df_proyectos.loc[df_proyectos['N_PROY'] == proj_nom, 'ID_PROY'].values[0]
-            id_i = df_items.loc[df_items['N_ITEM'] == item_nom, 'ID_ITEM'].unique()[0]
-            
-            # --- VALIDADOR DE DUPLICADOS ---
-            # Verificamos en el DataFrame local si ya existe el ítem en ese proyecto
-            existe = df_proy_detalle[
-                (df_proy_detalle['ID_PROY'] == id_p) & 
-                (df_proy_detalle['ID_ITEM'] == id_i)
-            ]
-            
-            if not existe.empty:
-                st.error(f"El ítem '{item_nom}' ya está cargado en este proyecto. Si quieres cambiar la cantidad, edítalo directamente en el Google Sheet.")
-            else:
-                # Si no existe, preparamos la fila y guardamos
-                id_carga = str(pd.Timestamp.now()) # Usamos timestamp como ID único de carga
-                nueva_fila = [id_carga, int(id_p), id_i, cantidad]
-                
-                try:
-                    sh.get_worksheet_by_id(1900275728).append_row(nueva_fila)
-                    st.success(f"✅ ¡Éxito! '{item_nom}' agregado al proyecto {proj_nom}.")
-                    # Limpiamos caché para que el próximo listado esté actualizado
-                    st.cache_data.clear() 
-                except Exception as e:
-                    st.error(f"Error al conectar con Google Sheets: {e}")
