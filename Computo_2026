@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 # ... (mismo código de conexión anterior) ...
-
+#
 # Carga de datos con los GIDs actualizados
 df_proy_detalle = load_data(1900275728) # ID_CARGA, ID_PROY, ID_ITEM, COMPUTO
 
