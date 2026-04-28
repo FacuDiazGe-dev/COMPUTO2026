@@ -43,7 +43,10 @@ elif modo == "Ver Consolidado":
         # 4. Traer info estética (Nombre, Unidad)
         final = resumen.merge(df_materiales, on='ID_MAT')
         
-        st.table(final[['N_MAT', 'CANT_TOTAL_MAT', 'UNIDAD']])if modo == "Cargar Ítems a Proyecto":
+        st.table(final[['N_MAT', 'CANT_TOTAL_MAT', 'UNIDAD']])
+
+
+if modo == "Cargar Ítems a Proyecto":
     st.subheader("Asignar Ítem a Proyecto")
     
     with st.form("form_carga"):
