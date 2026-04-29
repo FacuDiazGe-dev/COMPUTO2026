@@ -106,7 +106,7 @@ elif seccion == "Edición de Bases":
                 with col2:
                     nueva_unidad = st.text_input("Unidad (ej: kg, m3, unidad)")
                     nuevo_rubro = st.selectbox("Rubro Predeterminado", 
-                        ["Albañilería", "Electricidad", "Plomería", "Estructura", "Terminaciones", "Otros"])
+                        ["Albañilería", "Electricidad", "Plomería", "Estructura", "Terminaciones", "Aridos","Otros"])
                 
                 btn_guardar_mat = st.form_submit_button("Guardar Material")
 
