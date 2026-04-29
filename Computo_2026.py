@@ -92,14 +92,63 @@ elif opcion == "➕ Crear Proyecto":
                 st.warning("El nombre es obligatorio.")
 
 # --- MÓDULO 3: GESTIONAR ÍTEMS ---
+# --- MÓDULO 3: GESTIONAR ÍTEMS ---
 elif opcion == "🏗️ Gestionar Ítems":
-    st.subheader("Base de Datos de Ítems")
+    st.subheader("Catálogo de Ítems de Obra")
+    
+    # Cargamos Materiales (para el selector) e Ítems
+    df_mat = load_data(1931749204)
     df_items = load_data(50989702)
-    if df_items.empty:
-        st.info("No hay ítems registrados.")
-    else:
-        st.dataframe(df_items, use_container_width=True, hide_index=True)
 
+    if df_mat.empty:
+        st.warning("⚠️ Antes de crear Ítems, debes cargar materiales en el módulo '📦 Gestionar Materiales'.")
+    else:
+        with st.expander("➕ Crear Nuevo Ítem (Asociar Material)", expanded=df_items.empty):
+            with st.form("form_nuevo_item", clear_on_submit=True):
+                col1, col2 = st.columns(2)
+                with col1:
+                    n_item = st.text_input("Nombre del Ítem (ej: Revoque Grueso)")
+                    # Buscador de material desde el catálogo existente
+                    mat_nombres = df_mat['N_MAT'].tolist()
+                    mat_sel = st.selectbox("Material que consume", mat_nombres)
+                with col2:
+                    c_mat = st.number_input("Consumo de material por unidad de ítem", min_value=0.001, format="%.3f")
+                    st.caption("Ej: Si el ítem es m2 de muro, ¿cuántos kg de cemento lleva?")
+
+                if st.form_submit_button("Guardar Ítem"):
+                    if n_item:
+                        # 1. Obtener ID_MAT del material seleccionado
+                        id_m = df_mat.loc[df_mat['N_MAT'] == mat_sel, 'ID_MAT'].values[0]
+                        
+                        # 2. Generar ID_ITEM (Máximo + 1)
+                        nuevo_id_i = 1 if df_items.empty else int(df_items['ID_ITEM'].max()) + 1
+                        
+                        # 3. Preparar fila [ID_ITEM, N_ITEM, ID_MAT, C_MAT]
+                        nueva_fila_item = [nuevo_id_i, n_item, int(id_m), c_mat]
+                        
+                        try:
+                            sh.get_worksheet_by_id(50989702).append_row(nueva_fila_item)
+                            st.success(f"✅ Ítem '{n_item}' guardado correctamente.")
+                            st.cache_data.clear()
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error al guardar: {e}")
+                    else:
+                        st.warning("El nombre del ítem es obligatorio.")
+
+        # Visualización de Ítems existentes con cruce de nombres de materiales
+        if not df_items.empty:
+            st.write("### Listado de Ítems y Consumos")
+            
+            # Unimos con df_mat para mostrar el nombre del material en lugar de solo el ID
+            df_items_visual = df_items.merge(df_mat[['ID_MAT', 'N_MAT', 'UNIDAD']], on='ID_MAT', how='left')
+            
+            # Crear Código Visual para el Ítem
+            df_items_visual['CÓDIGO'] = df_items_visual['ID_ITEM'].apply(lambda x: f"ITM-{str(x).zfill(3)}")
+            
+            # Ordenar columnas para mostrar
+            cols_show = ['CÓDIGO', 'N_ITEM', 'N_MAT', 'C_MAT', 'UNIDAD']
+            st.dataframe(df_items_visual[cols_show], use_container_width=True, hide_index=True)
 # --- MÓDULO 4: GESTIONAR MATERIALES ---
 elif opcion == "📦 Gestionar Materiales":
     st.subheader("Catálogo Maestro de Materiales")
