@@ -1,54 +1,20 @@
 import streamlit as st
+from streamlit_gsheets import GSheetsConnection
 import pandas as pd
-import gspread
-from google.oauth2.service_account import Credentials
 
-# 1. Configuración de Conexión centralizada
+st.set_page_config(page_title="Gestor de Materiales 2026", layout="wide")
 
-@st.cache_resource
-def get_gsheet_client():
-    # 1. SCOPES CORREGIDOS (Deben ser URLs completas a las APIs)
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive"
-    ]
-    
-    # Obtenemos las secrets
-    creds_dict = dict(st.secrets["gcp_service_account"])
-    
-    # Limpiamos la clave privada (Streamlit a veces escapa los saltos de línea)
-    if "private_key" in creds_dict:
-        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-    
-    # Generamos credenciales
-    from google.oauth2.service_account import Credentials
-    import gspread
-    
-    creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
-    return gspread.authorize(creds)
+# 1. Configuración de Conexión (Usa los mismos secrets que ya tienes)
+conn = st.connection("gsheets", type=GSheetsConnection)
 
+# 2. Carga de datos usando los nombres de las pestañas (worksheets)
+# TTL=600 mantiene los datos en caché por 10 minutos
+sheet_url = "https://google.com"
 
-# 2. Función de carga con caché
-@st.cache_data(ttl=600)
-def load_data(gid, sheet_id):
-    client = get_gsheet_client() 
-    sh = client.open_by_key(sheet_id)
-    # Seleccionamos la hoja por su GID (id de la pestaña)
-    worksheet = sh.get_worksheet_by_id(gid)
-    return pd.DataFrame(worksheet.get_all_records())
-
-# --- INICIO DE LA APP ---
-sheet_id = "12plATZeI3STturtJtMog24m-e-WNGr1KcAOWQRuvVO0"
-
-# Carga de datos
-try:
-    df_proyectos = load_data(0, sheet_id)
-    df_materiales = load_data(1931749204, sheet_id)
-    df_items = load_data(50989702, sheet_id)
-    df_proy_detalle = load_data(1900275728, sheet_id)
-except Exception as e:
-    st.error(f"Error de conexión: {e}")
-    st.stop()
+df_proyectos = conn.read(spreadsheet=sheet_url, worksheet="PROYECTOS", ttl=600)
+df_materiales = conn.read(spreadsheet=sheet_url, worksheet="MATERIALES", ttl=600)
+df_items = conn.read(spreadsheet=sheet_url, worksheet="ITEMS", ttl=600)
+df_proy_detalle = conn.read(spreadsheet=sheet_url, worksheet="DETALLE_PROY", ttl=600)
 
 st.title("Gestor de Materiales 2026")
 
@@ -60,10 +26,12 @@ if modo == "Ver Consolidado":
     proyecto_sel = st.selectbox("Seleccionar Proyecto", df_proyectos['N_PROY'].unique())
     
     if st.button("Generar Listado"):
+        # Obtener ID del proyecto seleccionado
         id_p = df_proyectos.loc[df_proyectos['N_PROY'] == proyecto_sel, 'ID_PROY'].values[0]
         
-        # Lógica de cálculo
-        det = df_proy_detalle[df_proy_detalle['ID_PROY'] == id_p]
+        # Filtrar detalle y realizar el merge para el cálculo
+        det = df_proy_detalle[df_proy_detalle['ID_PROY'] == id_p].copy()
+        
         if not det.empty:
             merged = det.merge(df_items, on='ID_ITEM')
             merged['CANT_TOTAL_MAT'] = merged['COMPUTO'] * merged['C_MAT']
@@ -71,11 +39,33 @@ if modo == "Ver Consolidado":
             resumen = merged.groupby('ID_MAT')['CANT_TOTAL_MAT'].sum().reset_index()
             final = resumen.merge(df_materiales, on='ID_MAT')
             
-            st.dataframe(final[['N_MAT', 'CANT_TOTAL_MAT', 'UNIDAD', 'COSTO_UNITARIO']])
+            st.dataframe(final[['N_MAT', 'CANT_TOTAL_MAT', 'UNIDAD', 'COSTO_UNITARIO']], use_container_width=True)
         else:
-            st.warning("Este proyecto no tiene ítems cargados.")
+            st.warning("Este proyecto no tiene ítems asignados aún.")
 
 elif modo == "Cargar Ítems":
-    st.header("Asignar Ítems")
-    st.info("Formulario de carga listo para implementar.")
+    st.header("Asignar Nuevo Ítem")
+    
+    with st.form("nuevo_item_form"):
+        p_sel = st.selectbox("Proyecto", df_proyectos['N_PROY'].unique())
+        i_sel = st.selectbox("Ítem de Obra", df_items['N_ITEM'].unique())
+        cant = st.number_input("Cantidad (Cómputo)", min_value=0.0, step=0.1)
+        
+        btn_guardar = st.form_submit_button("Guardar en Sheet")
+        
+        if btn_guardar:
+            id_p = df_proyectos.loc[df_proyectos['N_PROY'] == p_sel, 'ID_PROY'].values[0]
+            id_i = df_items.loc[df_items['N_ITEM'] == i_sel, 'ID_ITEM'].values[0]
+            
+            # Crear DataFrame con la nueva fila
+            nueva_fila = pd.DataFrame([{"ID_PROY": id_p, "ID_ITEM": id_i, "COMPUTO": cant}])
+            
+            # Actualizar el Google Sheet (esto añade la fila al final)
+            # Nota: El conector lee la hoja actual, concatena y vuelve a escribir
+            actualizado = pd.concat([df_proy_detalle, nueva_fila], ignore_index=True)
+            conn.update(spreadsheet=sheet_url, worksheet="DETALLE_PROY", data=actualizado)
+            
+            st.success("¡Ítem guardado correctamente!")
+            st.cache_data.clear() # Limpiar caché para ver los cambios
+        
     
