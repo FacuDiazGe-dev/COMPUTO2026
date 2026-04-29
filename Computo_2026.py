@@ -102,32 +102,34 @@ elif opcion == "🏗️ Gestionar Ítems":
 
 # --- MÓDULO 4: GESTIONAR MATERIALES ---
 elif opcion == "📦 Gestionar Materiales":
-    st.subheader("Catálogo Maestro de Materiales")
+    st.subheader("Maestro de Materiales por Rubro")
     
     # Carga de datos actuales
     df_mat = load_data(1931749204)
     
-    # Formulario para agregar nuevo material
+    # Lista de Rubros sugeridos (puedes agregar los que necesites)
+    LISTA_RUBROS = ["Cementos", "Áridos", "Metales", "Albañilería", "Chapas", "Aislaciones", "Instalaciones", "Otros"]
+    
     with st.expander("➕ Agregar Nuevo Material al Catálogo", expanded=df_mat.empty):
         with st.form("form_nuevo_material", clear_on_submit=True):
-            col1, col2, col3 = st.columns([2, 1, 1])
+            col1, col2 = st.columns(2)
             with col1:
                 n_mat = st.text_input("Nombre del Material (ej: Arena Lavada)")
+                rubro_sel = st.selectbox("Rubro", LISTA_RUBROS)
             with col2:
-                unidad = st.selectbox("Unidad", ["m3", "kg", "un", "lts", "m2", "gl"])
-            with col3:
+                unidad = st.selectbox("Unidad", ["m3", "kg", "un", "lts", "m2", "gl", "barra"])
                 costo = st.number_input("Costo Unitario ($)", min_value=0.0, step=0.1)
             
             if st.form_submit_button("Guardar Material"):
                 if n_mat:
-                    # Generar ID_MAT (Máximo + 1)
                     nuevo_id_m = 1 if df_mat.empty else int(df_mat['ID_MAT'].max()) + 1
-                    
-                    nueva_fila_mat = [nuevo_id_m, n_mat, unidad, costo]
+                    # IMPORTANTE: Asegúrate de que el orden coincida con las columnas en tu Sheet
+                    # Ejemplo: [ID_MAT, NOMBRE, UNIDAD, COSTO, RUBRO]
+                    nueva_fila_mat = [nuevo_id_m, n_mat, unidad, costo, rubro_sel]
                     
                     try:
                         sh.get_worksheet_by_id(1931749204).append_row(nueva_fila_mat)
-                        st.success(f"✅ '{n_mat}' agregado al catálogo.")
+                        st.success(f"✅ '{n_mat}' guardado en el rubro '{rubro_sel}'.")
                         st.cache_data.clear()
                         st.rerun()
                     except Exception as e:
@@ -135,12 +137,17 @@ elif opcion == "📦 Gestionar Materiales":
                 else:
                     st.warning("El nombre del material es obligatorio.")
 
-    # Visualización de la tabla
+    # Visualización con filtros por rubro
     if not df_mat.empty:
         st.write("### Materiales Registrados")
-        st.dataframe(df_mat, use_container_width=True, hide_index=True)
+        
+        # Filtro rápido en la interfaz
+        rubro_filtro = st.multiselect("Filtrar por Rubro", df_mat['RUBRO'].unique(), default=df_mat['RUBRO'].unique())
+        df_filtrado = df_mat[df_mat['RUBRO'].isin(rubro_filtro)]
+        
+        st.dataframe(df_filtrado, use_container_width=True, hide_index=True)
     else:
-        st.info("El catálogo está vacío. Utiliza el formulario de arriba para empezar.")
+        st.info("El catálogo está vacío.")
 
 # --- MÓDULO 5: CONSOLIDADO FINAL ---
 elif opcion == "📊 Consolidado Final":
