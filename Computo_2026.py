@@ -92,29 +92,24 @@ elif opcion == "➕ Crear Proyecto":
                 st.warning("El nombre es obligatorio.")
 
 # --- MÓDULO 3: GESTIONAR ÍTEMS ---
-
 elif opcion == "🏗️ Gestionar Ítems":
     st.subheader("Análisis de Materiales por Ítem")
     
     df_mat = load_data(1931749204)
     df_items = load_data(50989702)
 
-    # Limpieza de IDs para evitar errores de tipo
     if not df_items.empty:
         df_items['ID_ITEM'] = pd.to_numeric(df_items['ID_ITEM'], errors='coerce')
 
     if "receta_temporal" not in st.session_state:
         st.session_state.receta_temporal = []
 
-    # 1. Definición del Nombre del Ítem
     n_item_nuevo = st.text_input("Nombre del Ítem", placeholder="Ej: Contrapiso de Cascotes").strip()
     
-    # Validación de existencia previa
     if n_item_nuevo and not df_items.empty:
         if n_item_nuevo.lower() in df_items['N_ITEM'].str.lower().unique():
             st.warning(f"⚠️ El ítem '{n_item_nuevo}' ya existe en la base de datos.")
 
-    # 2. Selector de Insumos (Sin Precios)
     with st.container(border=True):
         c1, c2, c3 = st.columns([2, 1, 1])
         with c1:
@@ -136,7 +131,6 @@ elif opcion == "🏗️ Gestionar Ítems":
                 else:
                     st.error("Verifica que exista el material y la cantidad sea mayor a 0.")
 
-    # 3. Tabla Temporal y Guardado
     if st.session_state.receta_temporal:
         st.write("### Composición Temporal del Ítem")
         df_temp = pd.DataFrame(st.session_state.receta_temporal)
@@ -153,31 +147,30 @@ elif opcion == "🏗️ Gestionar Ítems":
                 if not n_item_nuevo:
                     st.error("Falta el nombre del Ítem.")
                 else:
-                    # Lógica de ID autoincremental
-                if df_items.empty or df_items['ID_ITEM'].isnull().all():
-                    nuevo_id_i = 1
-                else:
-                    # Forzamos conversión a int de Python
-                    nuevo_id_i = int(df_items['ID_ITEM'].max()) + 1
-                
-                # CORRECCIÓN AQUÍ: Convertimos cada valor a tipos estándar de Python
-                filas_batch = []
-                for r in st.session_state.receta_temporal:
-                    filas_batch.append([
-                        int(nuevo_id_i),           # ID_ITEM como int
-                        str(n_item_nuevo),        # Nombre como string
-                        int(r['ID_MAT']),         # ID_MAT como int
-                        float(r['Cantidad'])      # Cantidad como float
-                    ])
-                
-                try:
-                    sh.get_worksheet_by_id(50989702).append_rows(filas_batch)
-                    st.success(f"Ítem '{n_item_nuevo}' guardado con éxito.")
-                    st.session_state.receta_temporal = []
-                    st.cache_data.clear()
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error de comunicación: {e}")
+                    # --- CORRECCIÓN DE INDENTACIÓN Y TIPOS ---
+                    if df_items.empty or df_items['ID_ITEM'].isnull().all():
+                        nuevo_id_i = 1
+                    else:
+                        nuevo_id_i = int(df_items['ID_ITEM'].max()) + 1
+                    
+                    filas_batch = []
+                    for r in st.session_state.receta_temporal:
+                        filas_batch.append([
+                            int(nuevo_id_i),
+                            str(n_item_nuevo),
+                            int(r['ID_MAT']),
+                            float(r['Cantidad'])
+                        ])
+                    
+                    try:
+                        sh.get_worksheet_by_id(50989702).append_rows(filas_batch)
+                        st.success(f"Ítem '{n_item_nuevo}' guardado con éxito.")
+                        st.session_state.receta_temporal = []
+                        st.cache_data.clear()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error de comunicación: {e}")
+                        
 
 # --- MÓDULO 4: GESTIONAR MATERIALES ---
 elif opcion == "📦 Gestionar Materiales":
