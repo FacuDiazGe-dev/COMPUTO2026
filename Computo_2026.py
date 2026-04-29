@@ -188,12 +188,27 @@ elif seccion == "Edición de Bases":
                     st.rerun()
     
         st.divider()
-    
+
+    # 1. BOTÓN DE REINICIO EN LA PARTE INFERIOR
+
+    col_t, col_b = st.columns([4, 1])
+    with col_b:
+        if st.button("🧹 Limpiar Pantalla"):
+            # Borramos las selecciones guardadas en la memoria de la sesión
+            for key in st.session_state.keys():
+                if "receta" in key or "mat" in key:
+                    del st.session_state[key]
+            st.rerun()
+            
         # 3. ASIGNAR MATERIALES A RECETA
         st.subheader("🔗 Composición de la Receta")
-        if not df_recetas.empty:
-            receta_sel = st.selectbox("Seleccione Ítem para editar:", df_recetas['Nombre_Item'].unique())
-            
+            if not df_recetas.empty:
+                # Usamos 'key' para que el botón de limpiar pueda resetearlo
+                receta_sel = st.selectbox(
+                    "Seleccione Ítem para editar su receta:", 
+                    df_recetas['Nombre_Item'].unique(),
+                    key="receta_activa"
+                )
             # Extraemos el ID de forma segura como STRING
             id_receta_sel = str(df_recetas[df_recetas['Nombre_Item'] == receta_sel]['ID_Receta'].iloc[0])
     
@@ -222,6 +237,15 @@ elif seccion == "Edición de Bases":
                     st.rerun()
                 except Exception as e:
                     st.error(f"Error: {e}")
+            # 3. BOTÓN DE CIERRE DE EDICIÓN AL FINAL
+            st.divider()
+            if st.button("✅ Finalizar Edición de este Ítem"):
+                st.success("Ítem guardado en base. Limpiando selección...")
+                # Forzamos la limpieza del caché y el reinicio
+                st.cache_data.clear()
+                # Usamos un pequeño truco para resetear el selectbox
+                st.session_state.receta_activa = df_recetas['Nombre_Item'].unique()[0] 
+                st.rerun()
 
 # 4. VISUALIZACIÓN DEL DETALLE (Con cálculo de Factor aplicado)
 st.write(f"**Insumos en: {receta_sel}**")
