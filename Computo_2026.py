@@ -9,8 +9,8 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 
 # 2. Carga de datos usando los nombres de las pestañas (worksheets)
 # TTL=600 mantiene los datos en caché por 10 minutos
-sheet_url = "heet_url = "https://docs.google.com/spreadsheets/d/1ABC1234567890XYZ/edit#gid=0"
-
+# Así debe quedar (usa TU URL real entre las comillas)
+sheet_url = "https://docs.google.com/spreadsheets/d/1ABC1234567890XYZ/edit#gid=0"
 
 df_proyectos = conn.read(spreadsheet=sheet_url, worksheet="PROYECTOS", ttl=600)
 df_materiales = conn.read(spreadsheet=sheet_url, worksheet="MATERIALES", ttl=600)
