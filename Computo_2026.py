@@ -105,4 +105,41 @@ elif modo == "📊 Ver Consolidado":
                 st.dataframe(final[['N_MAT', 'CANT_TOTAL_MAT', 'UNIDAD', 'COSTO_UNITARIO']], use_container_width=True)
             else:
                 st.warning("Sin ítems en este proyecto.")
-                
+
+# SECCIÓN: CREAR PROYECTO---------------------------------------------------------------------
+if modo == "➕ Crear Nuevo Proyecto":
+    st.header("Registrar Nuevo Proyecto")
+    
+    with st.form("nuevo_proy_form", clear_on_submit=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            nombre_proy = st.text_input("Nombre del Proyecto (ej: Edificio Centro)")
+        with col2:
+            cliente = st.text_input("Cliente / Empresa")
+        
+        submit = st.form_submit_button("🚀 Crear Proyecto")
+        
+        if submit:
+            if nombre_proy:
+                # Calculamos el nuevo ID basándonos en lo que ya existe
+                # Si la tabla está vacía o solo tiene encabezados, el ID será 1
+                try:
+                    if not df_proyectos.empty and 'ID_PROY' in df_proyectos.columns:
+                        nuevo_id = int(df_proyectos['ID_PROY'].max()) + 1
+                    else:
+                        nuevo_id = 1
+                    
+                    nueva_fila = [nuevo_id, nombre_proy, cliente]
+                    
+                    # Guardamos en la pestaña PROYECTOS (GID 0 usualmente)
+                    sh.worksheet("PROYECTOS").append_row(nueva_fila)
+                    
+                    st.success(f"✅ Proyecto '{nombre_proy}' registrado con ID: {nuevo_id}")
+                    
+                    # Limpiamos caché y recargamos para que aparezca en "Cargar Ítems"
+                    st.cache_data.clear()
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al guardar en Google Sheets: {e}")
+            else:
+                st.warning("Por favor, ingresa al menos el nombre del proyecto.")
