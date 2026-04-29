@@ -16,7 +16,7 @@ st.set_page_config(page_title="Gestor de Materiales 2026", layout="wide")
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # 3. URL de tu planilla
-sheet_url = "https://docs.google.com/spreadsheets/d/1ABC1234567890XYZ/edit#gid=0"
+sheet_url = "https://docs.google.com/spreadsheets/d/1ABC1234567890XYZ"
 
 # 4. Carga de datos con caché integrado (TTL de 10 minutos)
 df_proyectos = conn.read(spreadsheet=sheet_url, worksheet="PROYECTOS", ttl=600)
