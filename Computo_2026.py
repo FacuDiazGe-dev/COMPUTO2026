@@ -156,85 +156,85 @@ elif seccion == "Edición de Bases":
         else:
             st.info("El catálogo está vacío.")
         
-# ---------------------------------------------------------
-# 6.b APARTADO RECETAS: Definición de Ítems y su Composición
-# ---------------------------------------------------------
-with tab2:
-    st.subheader("Configuración de Ítems Tipo")
-    
-    # 1. CARGAR DATOS
-    df_recetas = load_data(1931749204)      
-    df_composicion = load_data(50989702)    
-    df_materiales = load_data(0)            
-
-    # 2. FORMULARIO: CREAR NUEVA RECETA
-    with st.expander("➕ Crear Nueva Receta (Ítem)", expanded=False):
-        with st.form("form_nueva_receta", clear_on_submit=True):
-            col1, col2 = st.columns(2)
-            with col1:
-                r_id = st.text_input("ID Receta (ej: REC-001)")
-                r_nombre = st.text_input("Nombre del Ítem")
-            with col2:
-                r_rubro = st.selectbox("Rubro", ["Albañilería", "Electricidad", "Plomería", "Estructura", "Aridos", "Otros"])
-            
-            btn_receta = st.form_submit_button("Crear Encabezado")
-
-        if btn_receta:
-            if r_id and r_nombre:
-                ws_rec = sh.get_worksheet_by_id(1931749204)
-                ws_rec.append_row([r_id, r_nombre, r_rubro])
-                st.success("✅ Ítem creado.")
-                st.cache_data.clear()
-                st.rerun()
-
-    st.divider()
-
-    # 3. ASIGNAR MATERIALES A RECETA
-    st.subheader("🔗 Composición de la Receta")
-    if not df_recetas.empty:
-        receta_sel = st.selectbox("Seleccione Ítem para editar:", df_recetas['Nombre_Item'].unique())
+    # ---------------------------------------------------------
+    # 6.b APARTADO RECETAS: Definición de Ítems y su Composición
+    # ---------------------------------------------------------
+    with tab2:
+        st.subheader("Configuración de Ítems Tipo")
         
-        # Extraemos el ID de forma segura como STRING
-        id_receta_sel = str(df_recetas[df_recetas['Nombre_Item'] == receta_sel]['ID_Receta'].iloc[0])
-
-        with st.form("form_agregar_material_receta", clear_on_submit=True):
-            c1, c2 = st.columns(2)
-            with c1:
-                mat_nombres = df_materiales['Nombre'].tolist()
-                mat_elegido = st.selectbox("Seleccionar Material:", mat_nombres)
-                # Extraemos el ID del material de forma segura
-                id_mat_elegido = str(df_materiales[df_materiales['Nombre'] == mat_elegido]['ID_Material'].iloc[0])
-            with c2:
-                cant_unitaria = st.number_input("Cantidad por unidad de ítem", min_value=0.000, format="%.3f", step=0.001)
+        # 1. CARGAR DATOS
+        df_recetas = load_data(1931749204)      
+        df_composicion = load_data(50989702)    
+        df_materiales = load_data(0)            
+    
+        # 2. FORMULARIO: CREAR NUEVA RECETA
+        with st.expander("➕ Crear Nueva Receta (Ítem)", expanded=False):
+            with st.form("form_nueva_receta", clear_on_submit=True):
+                col1, col2 = st.columns(2)
+                with col1:
+                    r_id = st.text_input("ID Receta (ej: REC-001)")
+                    r_nombre = st.text_input("Nombre del Ítem")
+                with col2:
+                    r_rubro = st.selectbox("Rubro", ["Albañilería", "Electricidad", "Plomería", "Estructura", "Aridos", "Otros"])
+                
+                btn_receta = st.form_submit_button("Crear Encabezado")
+    
+            if btn_receta:
+                if r_id and r_nombre:
+                    ws_rec = sh.get_worksheet_by_id(1931749204)
+                    ws_rec.append_row([r_id, r_nombre, r_rubro])
+                    st.success("✅ Ítem creado.")
+                    st.cache_data.clear()
+                    st.rerun()
+    
+        st.divider()
+    
+        # 3. ASIGNAR MATERIALES A RECETA
+        st.subheader("🔗 Composición de la Receta")
+        if not df_recetas.empty:
+            receta_sel = st.selectbox("Seleccione Ítem para editar:", df_recetas['Nombre_Item'].unique())
             
-            btn_add_mat = st.form_submit_button("Añadir Material")
-
-        if btn_add_mat:
-            try:
-                ws_comp = sh.get_worksheet_by_id(50989702)
-                ws_comp.append_row([id_receta_sel, id_mat_elegido, cant_unitaria])
-                st.success("✅ Material añadido.")
-                st.cache_data.clear()
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error: {e}")
-
-        # 4. VISUALIZACIÓN DEL DETALLE
-        st.write(f"**Insumos en: {receta_sel}**")
-        if not df_composicion.empty and 'ID_Receta' in df_composicion.columns:
-            # Forzamos string para comparar
-            df_composicion['ID_Receta'] = df_composicion['ID_Receta'].astype(str)
-            detalle = df_composicion[df_composicion['ID_Receta'] == id_receta_sel].copy()
-            
-            if not detalle.empty:
-                df_materiales['ID_Material'] = df_materiales['ID_Material'].astype(str)
-                # Unimos para mostrar nombres en vez de códigos
-                resumen = detalle.merge(df_materiales[['ID_Material', 'Nombre', 'Unidad']], on='ID_Material', how='left')
-                st.dataframe(resumen[['Nombre', 'Cantidad_Unitaria', 'Unidad']], use_container_width=True, hide_index=True)
-            else:
-                st.info("No hay materiales en esta receta.")
-    else:
-        st.info("Crea una receta primero.")
+            # Extraemos el ID de forma segura como STRING
+            id_receta_sel = str(df_recetas[df_recetas['Nombre_Item'] == receta_sel]['ID_Receta'].iloc[0])
+    
+            with st.form("form_agregar_material_receta", clear_on_submit=True):
+                c1, c2 = st.columns(2)
+                with c1:
+                    mat_nombres = df_materiales['Nombre'].tolist()
+                    mat_elegido = st.selectbox("Seleccionar Material:", mat_nombres)
+                    # Extraemos el ID del material de forma segura
+                    id_mat_elegido = str(df_materiales[df_materiales['Nombre'] == mat_elegido]['ID_Material'].iloc[0])
+                with c2:
+                    cant_unitaria = st.number_input("Cantidad por unidad de ítem", min_value=0.000, format="%.3f", step=0.001)
+                
+                btn_add_mat = st.form_submit_button("Añadir Material")
+    
+            if btn_add_mat:
+                try:
+                    ws_comp = sh.get_worksheet_by_id(50989702)
+                    ws_comp.append_row([id_receta_sel, id_mat_elegido, cant_unitaria])
+                    st.success("✅ Material añadido.")
+                    st.cache_data.clear()
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error: {e}")
+    
+            # 4. VISUALIZACIÓN DEL DETALLE
+            st.write(f"**Insumos en: {receta_sel}**")
+            if not df_composicion.empty and 'ID_Receta' in df_composicion.columns:
+                # Forzamos string para comparar
+                df_composicion['ID_Receta'] = df_composicion['ID_Receta'].astype(str)
+                detalle = df_composicion[df_composicion['ID_Receta'] == id_receta_sel].copy()
+                
+                if not detalle.empty:
+                    df_materiales['ID_Material'] = df_materiales['ID_Material'].astype(str)
+                    # Unimos para mostrar nombres en vez de códigos
+                    resumen = detalle.merge(df_materiales[['ID_Material', 'Nombre', 'Unidad']], on='ID_Material', how='left')
+                    st.dataframe(resumen[['Nombre', 'Cantidad_Unitaria', 'Unidad']], use_container_width=True, hide_index=True)
+                else:
+                    st.info("No hay materiales en esta receta.")
+        else:
+            st.info("Crea una receta primero.")
 
 # ---------------------------------------------------------
 # 7. SECCIÓN: GESTIÓN DE PROYECTOS (CARGA Y EDICIÓN)
