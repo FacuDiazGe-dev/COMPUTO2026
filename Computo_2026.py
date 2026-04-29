@@ -104,37 +104,43 @@ elif opcion == "🏗️ Gestionar Ítems":
     if "receta_temporal" not in st.session_state:
         st.session_state.receta_temporal = []
 
-    n_item_nuevo = st.text_input("Nombre del Ítem", placeholder="Ej: Contrapiso de Cascotes").strip()
+    # 1. Definición del Ítem (Nombre y su Unidad de medida global)
+    col_n1, col_n2 = st.columns([3, 1])
+    with col_n1:
+        n_item_nuevo = st.text_input("Nombre del Ítem", placeholder="Ej: Contrapiso de Cascotes").strip()
+    with col_n2:
+        u_item = st.selectbox("Unidad del Ítem", ["m2", "m3", "ml", "un", "kg", "gl"])
     
     if n_item_nuevo and not df_items.empty:
         if n_item_nuevo.lower() in df_items['N_ITEM'].str.lower().unique():
-            st.warning(f"⚠️ El ítem '{n_item_nuevo}' ya existe en la base de datos.")
+            st.warning(f"⚠️ El ítem '{n_item_nuevo}' ya existe.")
 
+    # 2. Selector de Insumos
     with st.container(border=True):
         c1, c2, c3 = st.columns([2, 1, 1])
         with c1:
             col_n = 'NOMBRE' if 'NOMBRE' in df_mat.columns else 'N_MAT'
             mat_sel = st.selectbox("Insumo a añadir", df_mat[col_n].unique() if not df_mat.empty else ["No hay materiales"])
         with c2:
-            cantidad = st.number_input("Cantidad/Consumo", min_value=0.0, format="%.4f")
+            cantidad_insumo = st.number_input("Cantidad/Consumo (C_MAT)", min_value=0.0, format="%.4f")
         with c3:
             st.write(" ")
             if st.button("➕ Añadir Insumo", use_container_width=True):
-                if not df_mat.empty and cantidad > 0:
+                if not df_mat.empty and cantidad_insumo > 0:
+                    # Extraemos la fila del material
                     material_row = df_mat[df_mat[col_n] == mat_sel].iloc[0]
                     st.session_state.receta_temporal.append({
                         "ID_MAT": material_row['ID_MAT'],
                         "Material": mat_sel,
-                        "Cantidad": cantidad,
-                        "Unidad": material_row['UNIDAD']
+                        "C_MAT": cantidad_insumo,
+                        "Unidad_Mat": material_row['UNIDAD']
                     })
-                else:
-                    st.error("Verifica que exista el material y la cantidad sea mayor a 0.")
 
+    # 3. Tabla Temporal y Guardado
     if st.session_state.receta_temporal:
-        st.write("### Composición Temporal del Ítem")
+        st.write("### Vista Previa de la Receta")
         df_temp = pd.DataFrame(st.session_state.receta_temporal)
-        st.table(df_temp[['Material', 'Cantidad', 'Unidad']])
+        st.table(df_temp[['Material', 'C_MAT', 'Unidad_Mat']])
 
         col_acc1, col_acc2 = st.columns(2)
         with col_acc1:
@@ -147,24 +153,27 @@ elif opcion == "🏗️ Gestionar Ítems":
                 if not n_item_nuevo:
                     st.error("Falta el nombre del Ítem.")
                 else:
-                    # --- CORRECCIÓN DE INDENTACIÓN Y TIPOS ---
+                    # Lógica de ID autoincremental
                     if df_items.empty or df_items['ID_ITEM'].isnull().all():
                         nuevo_id_i = 1
                     else:
                         nuevo_id_i = int(df_items['ID_ITEM'].max()) + 1
                     
+                    # --- ORDEN DE COLUMNAS CRÍTICO ---
+                    # Estructura: [ID_ITEM, N_ITEM, U_ITEM, ID_MAT, C_MAT]
                     filas_batch = []
                     for r in st.session_state.receta_temporal:
                         filas_batch.append([
-                            int(nuevo_id_i),
-                            str(n_item_nuevo),
-                            int(r['ID_MAT']),
-                            float(r['Cantidad'])
+                            int(nuevo_id_i),      # ID del ítem
+                            str(n_item_nuevo),   # Nombre
+                            str(u_item),         # Unidad del cómputo (m2, m3, etc)
+                            int(r['ID_MAT']),    # ID del material (pestaña maestra)
+                            float(r['C_MAT'])    # Coeficiente de consumo
                         ])
                     
                     try:
                         sh.get_worksheet_by_id(50989702).append_rows(filas_batch)
-                        st.success(f"Ítem '{n_item_nuevo}' guardado con éxito.")
+                        st.success(f"✅ Ítem '{n_item_nuevo}' guardado con éxito.")
                         st.session_state.receta_temporal = []
                         st.cache_data.clear()
                         st.rerun()
