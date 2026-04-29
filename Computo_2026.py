@@ -6,17 +6,16 @@ from google.oauth2.service_account import Credentials
 # 1. Configuración de Conexión centralizada
 @st.cache_resource
 def get_gsheet_client():
-    # SCOPES CORRECTOS: Son URLs específicas necesarias para Sheets
     scopes = [
         "https://googleapis.com",
         "https://googleapis.com"
     ]
     
-    creds_dict = st.secrets["gcp_service_account"]
+    # Creamos un nuevo diccionario (copia) para poder editar la clave
+    creds_dict = dict(st.secrets["gcp_service_account"])
     
-    # Reparación de la clave privada (el problema del \n)
     if "private_key" in creds_dict:
-        # Esto soluciona el RefreshError en la mayoría de los casos
+        # Ahora sí podemos modificar la copia sin que Streamlit proteste
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
     
     creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
