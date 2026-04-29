@@ -53,19 +53,41 @@ elif modo == "Cargar Ítems":
         
         btn_guardar = st.form_submit_button("Guardar en Sheet")
         
-        if btn_guardar:
+    if btn_guardar:
+        # 1. Obtener los IDs (asegurando que sean escalares con [0])
+        try:
             id_p = df_proyectos.loc[df_proyectos['N_PROY'] == p_sel, 'ID_PROY'].values[0]
             id_i = df_items.loc[df_items['N_ITEM'] == i_sel, 'ID_ITEM'].values[0]
             
-            # Crear DataFrame con la nueva fila
-            nueva_fila = pd.DataFrame([{"ID_PROY": id_p, "ID_ITEM": id_i, "COMPUTO": cant}])
+            # 2. Crear el DataFrame de la nueva fila
+            nueva_fila = pd.DataFrame([{
+                "ID_PROY": id_p, 
+                "ID_ITEM": id_i, 
+                "COMPUTO": cant
+            }])
             
-            # Actualizar el Google Sheet (esto añade la fila al final)
-            # Nota: El conector lee la hoja actual, concatena y vuelve a escribir
+            # 3. Concatenar con los datos previos
+            # Es importante que las columnas coincidan exactamente con df_proy_detalle
             actualizado = pd.concat([df_proy_detalle, nueva_fila], ignore_index=True)
-            conn.update(spreadsheet=sheet_url, worksheet="DETALLE_PROY", data=actualizado)
             
-            st.success("¡Ítem guardado correctamente!")
-            st.cache_data.clear() # Limpiar caché para ver los cambios
+            # 4. Enviar a Google Sheets
+            # El parámetro 'data' debe ser el DataFrame completo
+            conn.update(
+                spreadsheet=sheet_url, 
+                worksheet="DETALLE_PROY", 
+                data=actualizado
+            )
+            
+            st.success(f"✅ Ítem '{i_sel}' añadido a '{p_sel}' con éxito.")
+            
+            # 5. Limpiar caché y REEJECUTAR para actualizar la vista inmediatamente
+            st.cache_data.clear()
+            st.rerun() 
+    
+        except IndexError:
+            st.error("Error: No se encontró el ID del proyecto o del ítem.")
+        except Exception as e:
+            st.error(f"Hubo un problema al guardar: {e}")
+
         
     
