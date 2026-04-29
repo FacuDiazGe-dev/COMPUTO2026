@@ -268,13 +268,81 @@ elif seccion == "Edición de Bases":
 elif seccion == "Gestión de Proyectos":
     st.header("🛠️ Operación de Proyectos")
     
-    # 7.a Formulario para Crear / Cargar
-    with st.expander("➕ Cargar Nuevo Ítem a Proyecto", expanded=True):
-        # Aquí usaremos los selectbox alimentados por las bases globales
-        st.write("Seleccione Proyecto, Ítem de la Base y asigne el Cómputo.")
+    # 1. CARGAR DATOS
+    df_proy_items = load_data(1900275728) # Proyectos_Items
+    df_recetas = load_data(1931749204)    # Recetas_Global
+    
+    # 2. FORMULARIO: ASIGNAR ÍTEM A PROYECTO
+    with st.expander("➕ Cargar Ítem a un Proyecto", expanded=True):
+        with st.form("form_proy_items", clear_on_submit=True):
+            col1, col2 = st.columns(2)
+            with col1:
+                p_nombre = st.text_input("Nombre del Proyecto (ej: Casa Perez)")
+                p_id = st.text_input("ID Proyecto (ej: P-001)")
+            
+            with col2:
+                # Seleccionamos la Receta
+                receta_nombres = df_recetas['Nombre_Item'].tolist() if not df_recetas.empty else []
+                item_elegido = st.selectbox("Seleccionar Ítem (Receta Global):", receta_nombres)
+                
+                # Buscamos la unidad de la receta elegida para informar al usuario
+                unidad_sugerida = ""
+                if item_elegido:
+                    unidad_sugerida = df_recetas[df_recetas['Nombre_Item'] == item_elegido]['Unidad'].iloc[0]
+                
+                p_computo = st.number_input(f"Cómputo / Cantidad ({unidad_sugerida}):", min_value=0.01, format="%.2f")
+            
+            btn_guardar_proy = st.form_submit_button("Cargar Ítem al Proyecto")
+
+        if btn_guardar_proy:
+            if p_id and item_elegido:
+                try:
+                    # Obtenemos el ID de la receta de forma segura
+                    id_rec_elegida = str(df_recetas[df_recetas['Nombre_Item'] == item_elegido]['ID_Receta'].iloc[0])
+                    
+                    ws_proy = sh.get_worksheet_by_id(1900275728)
+                    # Guardamos: ID_PROY | NOMBRE_PROY | ID_RECETA | COMPUTO
+                    ws_proy.append_row([p_id, p_nombre, id_rec_elegida, p_computo])
+                    
+                    st.success(f"✅ Ítem '{item_elegido}' ({p_computo} {unidad_sugerida}) cargado a {p_nombre}")
+                    st.cache_data.clear()
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al guardar: {e}")
+            else:
+                st.warning("⚠️ Completa el ID de Proyecto y selecciona un Ítem.")
+
+    st.divider()
+
+    # 3. REVISIÓN Y EDICIÓN DE ÍTEMS CARGADOS
+    st.subheader("📋 Revisión de Ítems por Proyecto")
+    if not df_proy_items.empty:
+        proy_lista = df_proy_items['Nombre_Proyecto'].unique()
+        p_ver = st.selectbox("Seleccione Proyecto para ver sus ítems:", proy_lista)
         
-    # 7.b Edición de Ítems cargados
-    st.subheader("✏️ Ítems del Proyecto Seleccionado")
+        # Filtramos la tabla del proyecto
+        vista_proy = df_proy_items[df_proy_items['Nombre_Proyecto'] == p_ver].copy()
+        
+        # Unimos con recetas para traer el Nombre, Rubro y la nueva columna UNIDAD
+        if not df_recetas.empty:
+            df_recetas['ID_Receta'] = df_recetas['ID_Receta'].astype(str)
+            vista_proy['ID_Receta'] = vista_proy['ID_Receta'].astype(str)
+            vista_proy = vista_proy.merge(df_recetas[['ID_Receta', 'Nombre_Item', 'Rubro', 'Unidad']], on='ID_Receta', how='left')
+            
+        st.write(f"Listado de tareas para: **{p_ver}**")
+        st.dataframe(vista_proy[['Nombre_Item', 'Rubro', 'Computo', 'Unidad']], use_container_width=True, hide_index=True)
+        
+        # Opción propositiva: Botón para borrar el último ítem cargado por error
+        if st.button("🗑️ Borrar último ítem cargado"):
+            ws_proy = sh.get_worksheet_by_id(1900275728)
+            all_rows = ws_proy.get_all_values()
+            if len(all_rows) > 1:
+                ws_proy.delete_rows(len(all_rows))
+                st.warning("Última fila eliminada.")
+                st.cache_data.clear()
+                st.rerun()
+    else:
+        st.info("No hay ítems cargados aún.")
 
 
 
