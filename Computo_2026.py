@@ -87,12 +87,59 @@ elif seccion == "Edición de Bases":
     st.header("🧠 Repertorio Global")
     tab1, tab2 = st.tabs(["🛒 Catálogo de Materiales", "🍱 Recetas de Ítems"])
     
-    # 6.a Apartado Materiales
+# ---------------------------------------------------------
+# 6. SECCIÓN: EDICIÓN DE BASES (MATERIALES Y RECETAS)
+# ---------------------------------------------------------
+elif seccion == "Edición de Bases":
+    st.header("🧠 Repertorio Global")
+    tab1, tab2 = st.tabs(["🛒 Catálogo de Materiales", "🍱 Recetas de Ítems"])
+    
+    # -----------------------------------------------------
+    # 6.a APARTADO MATERIALES: Visualización y Carga
+    # -----------------------------------------------------
     with tab1:
         st.subheader("Gestión de Insumos")
+        
+        # Cargar datos actuales
         df_mat = load_data(0)
-        st.dataframe(df_mat, use_container_width=True)
-        # Aquí iría el formulario para st.form para añadir filas a gsheets
+        
+        # Formulario de carga
+        with st.expander("➕ Registrar Nuevo Material", expanded=False):
+            with st.form("form_nuevo_material", clear_on_submit=True):
+                col1, col2 = st.columns(2)
+                with col1:
+                    nuevo_id = st.text_input("ID Material (ej: MAT-001)")
+                    nuevo_nombre = st.text_input("Nombre del Material")
+                with col2:
+                    nueva_unidad = st.text_input("Unidad (ej: kg, m3, unidad)")
+                    nuevo_rubro = st.selectbox("Rubro Predeterminado", 
+                        ["Albañilería", "Electricidad", "Plomería", "Estructura", "Terminaciones", "Otros"])
+                
+                btn_guardar_mat = st.form_submit_button("Guardar Material")
+
+                if btn_guardar_mat:
+                    if nuevo_id and nuevo_nombre and nueva_unidad:
+                        try:
+                            # Acceder a la hoja específica (GID 0)
+                            ws_mat = sh.get_worksheet_by_id(0)
+                            # Preparar la fila
+                            nueva_fila = [nuevo_id, nuevo_nombre, nueva_unidad, nuevo_rubro]
+                            # Insertar en GSheets
+                            ws_mat.append_row(nueva_fila)
+                            
+                            st.success(f"✅ Material '{nuevo_nombre}' guardado correctamente.")
+                            st.cache_data.clear() # Limpiamos caché para ver el cambio
+                            st.rerun() 
+                        except Exception as e:
+                            st.error(f"Error al guardar: {e}")
+                    else:
+                        st.warning("⚠️ Por favor, completa los campos obligatorios (ID, Nombre y Unidad).")
+
+        # Visualización de la tabla
+        if not df_mat.empty:
+            st.dataframe(df_mat, use_container_width=True, hide_index=True)
+        else:
+            st.info("El catálogo está vacío.")
         
     # 6.b Apartado Recetas
     with tab2:
