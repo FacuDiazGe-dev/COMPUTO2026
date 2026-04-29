@@ -41,9 +41,12 @@ modo = st.sidebar.radio("Navegación", ["Ver Consolidado", "Cargar Ítems"])
 
 if modo == "Ver Consolidado":
     st.header("Consolidado de Proyecto")
+    
+    # Usamos 'NOMBRE' en lugar de 'N_PROY'
     proyecto_sel = st.selectbox("Seleccionar Proyecto", df_proyectos['NOMBRE'].unique())
     
     if st.button("Generar Listado"):
+        # También actualizamos aquí para buscar el ID usando la columna 'NOMBRE'
         id_p = df_proyectos.loc[df_proyectos['NOMBRE'] == proyecto_sel, 'ID_PROY'].values[0]
         
         # Filtrar detalle y calcular
@@ -56,16 +59,11 @@ if modo == "Ver Consolidado":
             resumen = merged.groupby('ID_MAT')['CANT_TOTAL_MAT'].sum().reset_index()
             final = resumen.merge(df_materiales, on='ID_MAT')
             
-            # Mostrar tabla final estilizada
             st.dataframe(
                 final[['N_MAT', 'CANT_TOTAL_MAT', 'UNIDAD', 'COSTO_UNITARIO']], 
                 use_container_width=True,
                 hide_index=True
             )
-            
-            # Cálculo de costo total opcional
-            total_presupuesto = (final['CANT_TOTAL_MAT'] * final['COSTO_UNITARIO']).sum()
-            st.metric("Costo Total Estimado", f"${total_presupuesto:,.2f}")
         else:
             st.warning("Este proyecto no tiene ítems asignados.")
 
