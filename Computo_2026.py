@@ -202,26 +202,27 @@ elif seccion == "Edición de Bases":
                 with c1:
                     mat_nombres = df_materiales['Nombre'].tolist()
                     mat_elegido = st.selectbox("Seleccionar Material:", mat_nombres)
-                    # Extraemos el ID del material de forma segura
                     id_mat_elegido = str(df_materiales[df_materiales['Nombre'] == mat_elegido]['ID_Material'].iloc[0])
-            with c2:
-                cant_unitaria = st.number_input("Cantidad Unitaria (Incidencia)", min_value=0.000, format="%.3f", step=0.001)
-                # NUEVO: Factor de conversión
-                factor_conv = st.number_input("Factor de Conversión (Divisor)", min_value=0.001, value=1.000, format="%.3f", help="Ej: Si usas kg y la bolsa es de 50kg, pon 50. Si no hay conversión, deja 1.")
-            
-            btn_add_mat = st.form_submit_button("Añadir Material")
+                
+                # ESTE BLOQUE DEBE ESTAR ALINEADO CON "with c1"
+                with c2:
+                    cant_unitaria = st.number_input("Cantidad Unitaria (Incidencia)", min_value=0.000, format="%.3f", step=0.001)
+                    factor_conv = st.number_input("Factor de Conversión (Divisor)", min_value=0.001, value=1.000, format="%.3f")
+                
+                # EL BOTÓN DEBE ESTAR DENTRO DEL "with st.form"
+                btn_add_mat = st.form_submit_button("Añadir Material")
 
-        if btn_add_mat:
-            try:
-                ws_comp = sh.get_worksheet_by_id(50989702)
-                # Guardamos ahora 4 valores: ID_Receta, ID_Material, Cantidad, Factor
-                ws_comp.append_row([id_receta_sel, id_mat_elegido, cant_unitaria, factor_conv])
-                st.success("✅ Material añadido con factor de conversión.")
-                st.cache_data.clear()
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error: {e}")
-    
+            # LA LÓGICA DE GUARDADO FUERA DEL FORMULARIO
+            if btn_add_mat:
+                try:
+                    ws_comp = sh.get_worksheet_by_id(50989702)
+                    ws_comp.append_row([id_receta_sel, id_mat_elegido, cant_unitaria, factor_conv])
+                    st.success("✅ Material añadido correctamente.")
+                    st.cache_data.clear()
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error: {e}")
+
             # 4. VISUALIZACIÓN DEL DETALLE
             st.write(f"**Insumos en: {receta_sel}**")
             if not df_composicion.empty and 'ID_Receta' in df_composicion.columns:
