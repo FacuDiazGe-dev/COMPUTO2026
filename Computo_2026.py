@@ -92,7 +92,7 @@ elif opcion == "➕ Crear Proyecto":
                 st.warning("El nombre es obligatorio.")
 
 # --- MÓDULO 3: GESTIONAR ÍTEMS ---
-# --- MÓDULO 3: GESTIONAR ÍTEMS (Análisis de Composición) ---
+
 elif opcion == "🏗️ Gestionar Ítems":
     st.subheader("Análisis de Materiales por Ítem")
     
@@ -154,19 +154,30 @@ elif opcion == "🏗️ Gestionar Ítems":
                     st.error("Falta el nombre del Ítem.")
                 else:
                     # Lógica de ID autoincremental
-                    nuevo_id_i = 1 if (df_items.empty or df_items['ID_ITEM'].isnull().all()) else int(df_items['ID_ITEM'].max()) + 1
-                    
-                    filas_batch = [[nuevo_id_i, n_item_nuevo, r['ID_MAT'], r['Cantidad']] 
-                                   for r in st.session_state.receta_temporal]
-                    
-                    try:
-                        sh.get_worksheet_by_id(50989702).append_rows(filas_batch)
-                        st.success(f"Ítem '{n_item_nuevo}' (ID: {nuevo_id_i}) guardado con éxito.")
-                        st.session_state.receta_temporal = []
-                        st.cache_data.clear()
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error de comunicación: {e}")
+                if df_items.empty or df_items['ID_ITEM'].isnull().all():
+                    nuevo_id_i = 1
+                else:
+                    # Forzamos conversión a int de Python
+                    nuevo_id_i = int(df_items['ID_ITEM'].max()) + 1
+                
+                # CORRECCIÓN AQUÍ: Convertimos cada valor a tipos estándar de Python
+                filas_batch = []
+                for r in st.session_state.receta_temporal:
+                    filas_batch.append([
+                        int(nuevo_id_i),           # ID_ITEM como int
+                        str(n_item_nuevo),        # Nombre como string
+                        int(r['ID_MAT']),         # ID_MAT como int
+                        float(r['Cantidad'])      # Cantidad como float
+                    ])
+                
+                try:
+                    sh.get_worksheet_by_id(50989702).append_rows(filas_batch)
+                    st.success(f"Ítem '{n_item_nuevo}' guardado con éxito.")
+                    st.session_state.receta_temporal = []
+                    st.cache_data.clear()
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error de comunicación: {e}")
 
 # --- MÓDULO 4: GESTIONAR MATERIALES ---
 elif opcion == "📦 Gestionar Materiales":
