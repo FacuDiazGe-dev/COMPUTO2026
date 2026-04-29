@@ -6,29 +6,33 @@ from google.oauth2.service_account import Credentials
 # 1. CONFIGURACIÓN DE PÁGINA
 st.set_page_config(page_title="Gestor Materiales 2026", layout="wide")
 
-# URL REAL CENTRALIZADA
-url_real = "https://google.com"
+# --- ERROR 1 CORREGIDO: URL DEL SPREADSHEET ---
+# Debes poner tu URL real, no "google.com"
+url_real = "https://docs.google.com/spreadsheets/d/12plATZeI3STturtJtMog24m-e-WNGr1KcAOWQRuvVO0/"
 
-# 2. CONEXIÓN (SCOPES CORRECTOS)
+# 2. CONEXIÓN
 @st.cache_resource
 def get_client():
     creds_dict = dict(st.secrets.connections.gsheets)
     creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
     
+    # --- ERROR 2 CORREGIDO: SCOPES COMPLETOS ---
+    # Es obligatorio usar estas URLs completas
     scopes = [
-        "https://googleapis.com",
-        "https://googleapis.com"
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
     ]
     
     creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
     return gspread.authorize(creds)
 
-# Inicialización
+# Inicialización con manejo de errores visible
 try:
     client = get_client()
     sh = client.open_by_url(url_real)
 except Exception as e:
-    st.error(f"Error de conexión: {e}")
+    st.error(f"❌ Error de conexión: {e}")
+    st.info("Revisa que la URL sea correcta y que los SCOPES en el código sean las URLs completas.")
     st.stop()
 
 # 3. FUNCIÓN DE CARGA POR GID
