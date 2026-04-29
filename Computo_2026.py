@@ -37,7 +37,8 @@ except Exception as e:
 # 3. Intentar acceder al Spreadsheet
 st.subheader("3. Accediendo al archivo")
 # CAMBIA ESTO POR TU URL REAL
-url_real = "https://docs.google.com/spreadsheets/d//12plATZeI3STturtJtMog24m-e-WNGr1KcAOWQRuvVO0/edit?gid=0#gid=0/edit" 
+# URL corregida y limpia
+url_real = "https://docs.google.com/spreadsheets/d/12plATZeI3STturtJtMog24m-e-WNGr1KcAOWQRuvVO0/" 
 
 try:
     # Extraemos el ID para probar de ambas formas
