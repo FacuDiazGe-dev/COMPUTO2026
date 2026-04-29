@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
-
+import traceback
 st.title("🧪 Diagnóstico de Conexión Extremo")
 
 # 1. Verificar si existen los Secrets
@@ -31,8 +31,8 @@ try:
     client = gspread.authorize(creds)
     st.write("✅ Objeto de credenciales creado correctamente.")
 except Exception as e:
-    st.error(f"❌ Fallo al crear credenciales: {e}")
-    st.stop()
+    st.error("❌ ERROR CRÍTICO")
+    st.text(traceback.format_exc()) # Esto imprimirá el error completo y real
 
 # 3. Intentar acceder al Spreadsheet
 st.subheader("3. Accediendo al archivo")
