@@ -247,40 +247,40 @@ elif seccion == "Edición de Bases":
                 st.session_state.receta_activa = df_recetas['Nombre_Item'].unique()[0] 
                 st.rerun()
 
-# 4. VISUALIZACIÓN DEL DETALLE (Con cálculo de Factor aplicado)
-st.write(f"**Insumos en: {receta_sel}**")
-
-if not df_composicion.empty and 'ID_Receta' in df_composicion.columns:
-    # 1. Limpieza y preparación de datos
-    df_composicion['ID_Receta'] = df_composicion['ID_Receta'].astype(str)
-    id_receta_sel_str = str(id_receta_sel) # Aseguramos que sea string
+    # 4. VISUALIZACIÓN DEL DETALLE (Con cálculo de Factor aplicado)
+    st.write(f"**Insumos en: {receta_sel}**")
     
-    # 2. Filtrar materiales de la receta seleccionada
-    detalle = df_composicion[df_composicion['ID_Receta'] == id_receta_sel_str].copy()
-    
-    if not detalle.empty:
-        # 3. Asegurar que las columnas numéricas sean tratadas como tales
-        detalle['Cantidad_Unitaria'] = pd.to_numeric(detalle['Cantidad_Unitaria'], errors='coerce')
-        detalle['Factor'] = pd.to_numeric(detalle['Factor'], errors='coerce').fillna(1)
+    if not df_composicion.empty and 'ID_Receta' in df_composicion.columns:
+        # 1. Limpieza y preparación de datos
+        df_composicion['ID_Receta'] = df_composicion['ID_Receta'].astype(str)
+        id_receta_sel_str = str(id_receta_sel) # Aseguramos que sea string
         
-        # 4. APLICAR LA DIVISIÓN PARA MOSTRAR LA CANTIDAD FINAL
-        detalle['Cantidad_Calculada'] = detalle['Cantidad_Unitaria'] / detalle['Factor']
+        # 2. Filtrar materiales de la receta seleccionada
+        detalle = df_composicion[df_composicion['ID_Receta'] == id_receta_sel_str].copy()
         
-        # 5. Unir con nombres de materiales
-        df_materiales['ID_Material'] = df_materiales['ID_Material'].astype(str)
-        resumen = detalle.merge(df_materiales[['ID_Material', 'Nombre', 'Unidad']], on='ID_Material', how='left')
-        
-        # 6. Mostrar la tabla con la columna ya calculada
-        # Cambiamos el nombre de la columna para que el usuario entienda qué ve
-        resumen = resumen.rename(columns={'Cantidad_Calculada': 'Cant. Real (incidencia)'})
-        
-        st.dataframe(
-            resumen[['Nombre', 'Cant. Real (incidencia)', 'Unidad']], 
-            use_container_width=True, 
-            hide_index=True
-        )
-    else:
-        st.info("No hay materiales en esta receta.")
+        if not detalle.empty:
+            # 3. Asegurar que las columnas numéricas sean tratadas como tales
+            detalle['Cantidad_Unitaria'] = pd.to_numeric(detalle['Cantidad_Unitaria'], errors='coerce')
+            detalle['Factor'] = pd.to_numeric(detalle['Factor'], errors='coerce').fillna(1)
+            
+            # 4. APLICAR LA DIVISIÓN PARA MOSTRAR LA CANTIDAD FINAL
+            detalle['Cantidad_Calculada'] = detalle['Cantidad_Unitaria'] / detalle['Factor']
+            
+            # 5. Unir con nombres de materiales
+            df_materiales['ID_Material'] = df_materiales['ID_Material'].astype(str)
+            resumen = detalle.merge(df_materiales[['ID_Material', 'Nombre', 'Unidad']], on='ID_Material', how='left')
+            
+            # 6. Mostrar la tabla con la columna ya calculada
+            # Cambiamos el nombre de la columna para que el usuario entienda qué ve
+            resumen = resumen.rename(columns={'Cantidad_Calculada': 'Cant. Real (incidencia)'})
+            
+            st.dataframe(
+                resumen[['Nombre', 'Cant. Real (incidencia)', 'Unidad']], 
+                use_container_width=True, 
+                hide_index=True
+            )
+        else:
+            st.info("No hay materiales en esta receta.")
 
 # ---------------------------------------------------------
 # 7. SECCIÓN: GESTIÓN DE PROYECTOS (CARGA Y EDICIÓN)
