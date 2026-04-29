@@ -2,6 +2,12 @@ import streamlit as st
 import pandas as pd
 from streamlit_gsheets import GSheetsConnection
 
+# AÑADE ESTO PARA DIAGNÓSTICO
+if "connections" in st.secrets and "gsheets" in st.secrets.connections:
+    st.write(f"Intentando conectar con: {st.secrets.connections.gsheets['client_email']}")
+else:
+    st.error("No se detectó la configuración [connections.gsheets] en los Secrets.")
+    
 # 1. Configuración de página
 st.set_page_config(page_title="Gestor de Materiales 2026", layout="wide")
 
