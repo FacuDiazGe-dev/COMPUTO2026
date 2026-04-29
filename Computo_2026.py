@@ -374,4 +374,4 @@ elif opcion == "📊 Consolidado Final":
 
                 # Opción de descarga
                 csv = final[cols_finales].to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Descargar CSV", csv, f"Consolidado_{proy_sel}.csv", "text/csv").")
+                st.download_button("📥 Descargar CSV", csv, f"Consolidado_{proy_sel}.csv", "text/csv")
