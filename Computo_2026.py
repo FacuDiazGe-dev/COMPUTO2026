@@ -4,24 +4,29 @@ import gspread
 from google.oauth2.service_account import Credentials
 
 # 1. Configuración de Conexión centralizada
+
 @st.cache_resource
 def get_gsheet_client():
-    # Estas URLs deben ser EXACTAMENTE así
+    # 1. SCOPES CORREGIDOS (Deben ser URLs completas a las APIs)
     scopes = [
-        "https://googleapis.com",
-        "https://googleapis.com"
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
     ]
     
-    # Creamos la copia para evitar el error de "item assignment"
+    # Obtenemos las secrets
     creds_dict = dict(st.secrets["gcp_service_account"])
     
-    # Limpiamos la clave privada
+    # Limpiamos la clave privada (Streamlit a veces escapa los saltos de línea)
     if "private_key" in creds_dict:
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
     
-    # Generamos credenciales con los scopes corregidos
+    # Generamos credenciales
+    from google.oauth2.service_account import Credentials
+    import gspread
+    
     creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
     return gspread.authorize(creds)
+
 
 # 2. Función de carga con caché
 @st.cache_data(ttl=600)
