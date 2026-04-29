@@ -91,6 +91,80 @@ elif opcion == "➕ Crear Proyecto":
             else:
                 st.warning("El nombre es obligatorio.")
 
+
+# --- MÓDULO: CARGAR CÓMPUTOS ---
+elif opcion == "📐 Cargar Cómputos":
+    st.subheader("Asignación de Ítems a Proyectos")
+    
+    df_proy = load_data(0)
+    df_items_base = load_data(50989702)
+    df_detalle = load_data(1900275728) # PROY_DETALLE
+    
+    if df_proy.empty or df_items_base.empty:
+        st.warning("⚠️ Se requieren Proyectos e Ítems para continuar.")
+    else:
+        with st.form("form_computo", clear_on_submit=True):
+            col1, col2, col3 = st.columns([2, 2, 1])
+            
+            with col1:
+                proy_sel = st.selectbox("Proyecto", df_proy['NOMBRE'].unique())
+            
+            with col2:
+                # Obtenemos ítems únicos para el selector
+                items_unicos = df_items_base[['ID_ITEM', 'N_ITEM', 'U_ITEM']].drop_duplicates('ID_ITEM')
+                item_sel_nombre = st.selectbox("Ítem de Obra", items_unicos['N_ITEM'].unique())
+            
+            with col3:
+                unidad_txt = items_unicos.loc[items_unicos['N_ITEM'] == item_sel_nombre, 'U_ITEM'].values[0]
+                cantidad_obra = st.number_input(f"Cantidad ({unidad_txt})", min_value=0.0, step=0.1)
+
+            if st.form_submit_button("➕ Registrar Cómputo"):
+                if cantidad_obra > 0:
+                    try:
+                        # IDs de Proyecto e Ítem
+                        id_p = int(df_proy.loc[df_proy['NOMBRE'] == proy_sel, 'ID_PROY'].values[0])
+                        id_i = int(items_unicos.loc[items_unicos['N_ITEM'] == item_sel_nombre, 'ID_ITEM'].values[0])
+                        
+                        # Lógica robusta para ID_CARGA (Autoincremental)
+                        if df_detalle.empty or 'ID_CARGA' not in df_detalle.columns or df_detalle['ID_CARGA'].isnull().all():
+                            nuevo_id_carga = 1
+                        else:
+                            nuevo_id_carga = int(pd.to_numeric(df_detalle['ID_CARGA'], errors='coerce').max()) + 1
+                        
+                        # Estructura: [ID_CARGA, ID_PROY, ID_ITEM, COMPUTO]
+                        nueva_fila = [nuevo_id_carga, id_p, id_i, cantidad_obra]
+                        
+                        sh.get_worksheet_by_id(1900275728).append_row(nueva_fila)
+                        
+                        st.success(f"✅ Registrado: {item_sel_nombre} en {proy_sel} (Carga #{nuevo_id_carga})")
+                        st.cache_data.clear()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error técnico al vincular: {e}")
+                else:
+                    st.error("La cantidad debe ser mayor a 0.")
+
+        # Visualización de lo cargado en el proyecto seleccionado
+        st.divider()
+        st.write(f"### Detalle de obra: {proy_sel}")
+        
+        if not df_detalle.empty:
+            id_p_actual = df_proy.loc[df_proy['NOMBRE'] == proy_sel, 'ID_PROY'].values[0]
+            # Filtrado estricto por ID_PROY
+            mis_items = df_detalle[pd.to_numeric(df_detalle['ID_PROY']) == int(id_p_actual)]
+            
+            if not mis_items.empty:
+                # Merge con la base de ítems para mostrar nombres
+                tabla_visual = mis_items.merge(items_unicos, on='ID_ITEM', how='left')
+                st.dataframe(
+                    tabla_visual[['ID_CARGA', 'N_ITEM', 'COMPUTO', 'U_ITEM']], 
+                    use_container_width=True, 
+                    hide_index=True
+                )
+            else:
+                st.info("No hay cómputos cargados para este proyecto.")
+
+
 # --- MÓDULO 3: GESTIONAR ÍTEMS ---
 elif opcion == "🏗️ Gestionar Ítems":
     st.subheader("Análisis de Materiales por Ítem")
