@@ -156,11 +156,80 @@ elif seccion == "Edición de Bases":
         else:
             st.info("El catálogo está vacío.")
         
-    # 6.b Apartado Recetas
+    # -----------------------------------------------------
+    # 6.b APARTADO RECETAS: Definición de Ítems y su Composición
+    # -----------------------------------------------------
     with tab2:
         st.subheader("Configuración de Ítems Tipo")
-        df_rec = load_data(1931749204)
-        st.dataframe(df_rec, use_container_width=True)
+        
+        # 1. CARGAR DATOS
+        df_recetas = load_data(1931749204)      # Recetas_Global
+        df_composicion = load_data(50989702)    # Composicion_Recetas
+        df_materiales = load_data(0)            # Materiales_Global (para elegir)
+
+        # 2. FORMULARIO: CREAR NUEVO ÍTEM (LA CABECERA)
+        with st.expander("➕ Crear Nueva Receta (Ítem)", expanded=False):
+            with st.form("form_nueva_receta", clear_on_submit=True):
+                col1, col2 = st.columns(2)
+                with col1:
+                    r_id = st.text_input("ID Receta (ej: REC-001)")
+                    r_nombre = st.text_input("Nombre del Ítem (ej: Revoque Fino)")
+                with col2:
+                    r_rubro = st.selectbox("Rubro del Ítem", 
+                        ["Albañilería", "Electricidad", "Plomería", "Estructura", "Aridos", "Otros"], key="rubro_rec")
+                
+                btn_receta = st.form_submit_button("Crear Encabezado de Receta")
+
+            if btn_receta:
+                if r_id and r_nombre:
+                    ws_rec = sh.get_worksheet_by_id(1931749204)
+                    ws_rec.append_row([r_id, r_nombre, r_rubro])
+                    st.success(f"✅ Ítem '{r_nombre}' creado. Ahora asígnale materiales abajo.")
+                    st.cache_data.clear()
+                    st.rerun()
+
+        st.divider()
+
+        # 3. ASIGNAR MATERIALES A UNA RECETA EXISTENTE
+        st.subheader("🔗 Composición de la Receta")
+        if not df_recetas.empty:
+            # Seleccionamos la receta a la que queremos agregarle materiales
+            receta_sel = st.selectbox("Seleccione Ítem para editar su receta:", 
+                                     df_recetas['Nombre_Item'].unique())
+            
+            # Obtenemos el ID de esa receta
+            id_receta_sel = df_recetas[df_recetas['Nombre_Item'] == receta_sel]['ID_Receta'].values[0]
+
+            with st.form("form_agregar_material_receta", clear_on_submit=True):
+                c1, c2 = st.columns([2, 1])
+                with c1:
+                    # El usuario elige el material por nombre, pero nosotros guardamos el ID
+                    mat_nombres = df_materiales['Nombre'].tolist()
+                    mat_elegido = st.selectbox("Seleccionar Material del Catálogo:", mat_nombres)
+                    id_mat_elegido = df_materiales[df_materiales['Nombre'] == mat_elegido]['ID_Material'].values[0]
+                with c2:
+                    cant_unitaria = st.number_input("Cantidad Unitaria", min_value=0.001, format="%.3f")
+                
+                btn_add_mat = st.form_submit_button("Añadir Material a esta Receta")
+
+            if btn_add_mat:
+                ws_comp = sh.get_worksheet_by_id(50989702)
+                ws_comp.append_row([id_receta_sel, id_mat_elegido, cant_unitaria])
+                st.success(f"✅ Añadido {mat_elegido} a la receta {receta_sel}")
+                st.cache_data.clear()
+                st.rerun()
+
+            # 4. VISUALIZACIÓN DE LA COMPOSICIÓN ACTUAL
+            st.write(f"**Materiales actuales en: {receta_sel}**")
+            detalle = df_composicion[df_composicion['ID_Receta'] == id_receta_sel]
+            if not detalle.empty:
+                # Unimos con materiales para ver el nombre y no solo el ID
+                detalle_print = detalle.merge(df_materiales[['ID_Material', 'Nombre', 'Unidad']], on='ID_Material')
+                st.table(detalle_print[['Nombre', 'Cantidad_Unitaria', 'Unidad']])
+            else:
+                st.info("Esta receta aún no tiene materiales asignados.")
+        else:
+            st.info("Primero crea un Ítem en el formulario de arriba.")
 
 # ---------------------------------------------------------
 # 7. SECCIÓN: GESTIÓN DE PROYECTOS (CARGA Y EDICIÓN)
