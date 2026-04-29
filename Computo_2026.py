@@ -94,43 +94,78 @@ elif opcion == "➕ Crear Proyecto":
 # --- MÓDULO 3: GESTIONAR ÍTEMS ---
 
 elif opcion == "🏗️ Gestionar Ítems":
-    st.subheader("Catálogo de Ítems de Obra")
+    st.subheader("Configuración de Ítem (Análisis de Materiales)")
     
     df_mat = load_data(1931749204)
     df_items = load_data(50989702)
 
-    if df_mat.empty:
-        st.warning("⚠️ Primero debes cargar materiales.")
-    else:
-        # Usamos un nombre de formulario único: "form_nuevo_item_obra"
-        with st.form("form_nuevo_item_obra", clear_on_submit=True):
-            col1, col2 = st.columns(2)
-            with col1:
-                n_item = st.text_input("Nombre del Ítem (ej: Revoque Grueso)")
-                mat_nombres = df_mat['NOMBRE'].tolist() if 'NOMBRE' in df_mat.columns else df_mat['N_MAT'].tolist()
-                mat_sel = st.selectbox("Material que consume", mat_nombres)
-            with col2:
-                c_mat = st.number_input("Consumo de material por unidad de ítem", min_value=0.0, format="%.3f")
-            
-            # EL BOTÓN DEBE ESTAR DENTRO DEL BLOQUE 'WITH'
-            btn_guardar_item = st.form_submit_button("💾 Guardar Ítem")
-            
-            if btn_guardar_item:
-                if n_item:
-                    # Buscamos el ID_MAT basándonos en el nombre seleccionado
-                    col_busqueda = 'NOMBRE' if 'NOMBRE' in df_mat.columns else 'N_MAT'
-                    id_m = df_mat.loc[df_mat[col_busqueda] == mat_sel, 'ID_MAT'].values[0]
-                    
+    # 1. Inicializar la tabla temporal en la sesión si no existe
+    if "receta_temporal" not in st.session_state:
+        st.session_state.receta_temporal = []
+
+    # 2. Formulario para definir el Ítem y agregar materiales a la lista
+    with st.container(border=True):
+        col_it, col_empty = st.columns([2, 1])
+        with col_it:
+            n_item_nuevo = st.text_input("Nombre del Ítem a crear", placeholder="Ej: Hormigón H21")
+        
+        st.divider()
+        st.write("### Agregar Materiales a la Receta")
+        c1, c2, c3 = st.columns([2, 1, 1])
+        
+        with c1:
+            mat_nombres = df_mat['NOMBRE'].tolist() if 'NOMBRE' in df_mat.columns else df_mat['N_MAT'].tolist()
+            mat_sel = st.selectbox("Seleccionar Material", mat_nombres)
+        with c2:
+            cantidad = st.number_input("Cantidad/Coeficiente", min_value=0.000, format="%.3f")
+        with c3:
+            st.write(" ") # Espaciador
+            if st.button("➕ Añadir a la lista"):
+                # Buscar datos del material
+                col_n = 'NOMBRE' if 'NOMBRE' in df_mat.columns else 'N_MAT'
+                row_m = df_mat[df_mat[col_n] == mat_sel].iloc[0]
+                
+                # Agregar a la sesión
+                st.session_state.receta_temporal.append({
+                    "ID_MAT": row_m['ID_MAT'],
+                    "Material": mat_sel,
+                    "Cantidad": cantidad,
+                    "Unidad": row_m['UNIDAD']
+                })
+
+    # 3. Mostrar la tabla temporal y botón de guardado final
+    if st.session_state.receta_temporal:
+        st.write("### Vista Previa del Ítem")
+        df_temp = pd.DataFrame(st.session_state.receta_temporal)
+        st.table(df_temp) # Tabla simple para vista previa
+        
+        col_btn1, col_btn2 = st.columns(2)
+        with col_btn1:
+            if st.button("🗑️ Borrar Lista"):
+                st.session_state.receta_temporal = []
+                st.rerun()
+        
+        with col_btn2:
+            if st.button("💾 GUARDAR ÍTEM COMPLETO EN GSHEETS"):
+                if n_item_nuevo:
+                    # Determinar nuevo ID_ITEM
                     nuevo_id_i = 1 if df_items.empty else int(df_items['ID_ITEM'].max()) + 1
-                    nueva_fila_item = [nuevo_id_i, n_item, int(id_m), c_mat]
+                    
+                    # Preparar todas las filas para append_rows (plural)
+                    filas_a_subir = []
+                    for m in st.session_state.receta_temporal:
+                        filas_a_subir.append([nuevo_id_i, n_item_nuevo, m['ID_MAT'], m['Cantidad']])
                     
                     try:
-                        sh.get_worksheet_by_id(50989702).append_row(nueva_fila_item)
-                        st.success(f"✅ Ítem '{n_item}' guardado.")
+                        sh.get_worksheet_by_id(50989702).append_rows(filas_a_subir)
+                        st.success(f"✅ Ítem '{n_item_nuevo}' creado con {len(filas_a_subir)} materiales.")
+                        st.session_state.receta_temporal = [] # Limpiar lista
                         st.cache_data.clear()
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Error: {e}")
+                        st.error(f"Error al subir: {e}")
+                else:
+                    st.error("Debes ponerle un nombre al Ítem antes de guardar.")
 
 
 # --- MÓDULO 4: GESTIONAR MATERIALES ---
