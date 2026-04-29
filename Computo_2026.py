@@ -16,6 +16,15 @@ def load_data(gid, sheet_id, client):
     worksheet = sh.get_worksheet_by_id(gid)
     return pd.DataFrame(worksheet.get_all_records())
 
+# 3. Caching
+
+@st.cache_data(ttl=600)  # Los datos se guardan 10 min en memoria
+def load_data(gid, sheet_id):
+    client = get_gsheet_client() # Conectar dentro para que el cliente sea parte del flujo cacheado
+    sh = client.open_by_key(sheet_id)
+    worksheet = sh.get_worksheet_by_id(gid)
+    return pd.DataFrame(worksheet.get_all_records())
+
 # --- INICIO DE LA APP ---
 client = get_gsheet_client()
 sheet_id = "12plATZeI3STturtJtMog24m-e-WNGr1KcAOWQRuvVO0"
