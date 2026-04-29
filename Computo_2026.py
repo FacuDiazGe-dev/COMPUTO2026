@@ -6,18 +6,20 @@ from google.oauth2.service_account import Credentials
 # 1. Configuración de Conexión centralizada
 @st.cache_resource
 def get_gsheet_client():
+    # Estas URLs deben ser EXACTAMENTE así
     scopes = [
         "https://googleapis.com",
         "https://googleapis.com"
     ]
     
-    # Creamos un nuevo diccionario (copia) para poder editar la clave
+    # Creamos la copia para evitar el error de "item assignment"
     creds_dict = dict(st.secrets["gcp_service_account"])
     
+    # Limpiamos la clave privada
     if "private_key" in creds_dict:
-        # Ahora sí podemos modificar la copia sin que Streamlit proteste
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
     
+    # Generamos credenciales con los scopes corregidos
     creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
     return gspread.authorize(creds)
 
