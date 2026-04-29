@@ -63,26 +63,88 @@ with st.sidebar:
     st.info("Sistema de Cómputo de Materiales v1.0")
 
 # ---------------------------------------------------------
-# 5. SECCIÓN: INICIO (RECEPCIÓN Y TABLA GENERAL)
+# 5. SECCIÓN: INICIO (CONDENSADOR Y REPORTES)
 # ---------------------------------------------------------
 if seccion == "Inicio":
-    st.header("📋 Panel de Proyectos Activos")
+    st.header("📊 Panel de Control y Reportes")
     
-    # Cargamos datos de la Pestaña 4 (Proyectos_Items)
-    df_proy_items = load_data(1900275728)
-    
+    # 1. CARGA DE DATOS PARA EL CÁLCULO
+    df_proy_items = load_data(1900275728) # Proyectos_Items
+    df_recetas = load_data(1931749204)    # Recetas_Global
+    df_comp = load_data(50989702)         # Composicion_Recetas
+    df_mat = load_data(0)                 # Materiales_Global
+
     if not df_proy_items.empty:
-        # Mostramos proyectos únicos (agrupados)
+        # 5.a Tabla General de Proyectos (Resumen rápido)
         proyectos_unicos = df_proy_items[['ID_Proyecto', 'Nombre_Proyecto']].drop_duplicates()
-        st.dataframe(proyectos_unicos, use_container_width=True, hide_index=True)
+        proyectos_unicos = proyectos_unicos[proyectos_unicos['ID_Proyecto'] != ""] # Limpiar vacíos
         
-        # 5.a Selección para Informe Rápido
-        st.subheader("📄 Emisión de Informe")
-        p_sel = st.selectbox("Seleccione un proyecto para procesar:", proyectos_unicos['Nombre_Proyecto'])
-        if st.button("Generar Resumen de Materiales"):
-            st.warning("Lógica del condensador en desarrollo...")
+        st.subheader("Proyectos en curso")
+        st.dataframe(proyectos_unicos, use_container_width=True, hide_index=True)
+
+        st.divider()
+
+        # 5.b LÓGICA DEL CONDENSADOR
+        st.subheader("📦 Generar Listado de Materiales")
+        p_sel = st.selectbox("Seleccione Proyecto para emitir listado:", proyectos_unicos['Nombre_Proyecto'])
+
+        if p_sel:
+            # 1. Filtrar ítems asignados a este proyecto (quitar la fila "INICIO")
+            items_obra = df_proy_items[(df_proy_items['Nombre_Proyecto'] == p_sel) & 
+                                      (df_proy_items['ID_Receta'] != "INICIO")].copy()
+            
+            if not items_obra.empty and not df_comp.empty:
+                # Unificar tipos de datos para los MERGE
+                items_obra['ID_Receta'] = items_obra['ID_Receta'].astype(str)
+                df_comp['ID_Receta'] = df_comp['ID_Receta'].astype(str)
+                df_mat['ID_Material'] = df_mat['ID_Material'].astype(str)
+                df_comp['ID_Material'] = df_comp['ID_Material'].astype(str)
+
+                # 2. CRUCE DE TABLAS
+                # Cruzamos items de obra con su composición (recetas)
+                calculo = items_obra.merge(df_comp, on='ID_Receta')
+                
+                # Convertimos columnas a números
+                calculo['Computo'] = pd.to_numeric(calculo['Computo'], errors='coerce')
+                calculo['Cantidad_Unitaria'] = pd.to_numeric(calculo['Cantidad_Unitaria'], errors='coerce')
+                calculo['Factor'] = pd.to_numeric(calculo['Factor'], errors='coerce').fillna(1)
+
+                # 3. CÁLCULO MATEMÁTICO FINAL
+                calculo['Total_Necesario'] = (calculo['Computo'] * calculo['Cantidad_Unitaria']) / calculo['Factor']
+
+                # 4. TRAER NOMBRES Y RUBROS DE MATERIALES
+                reporte_detallado = calculo.merge(df_mat, on='ID_Material')
+
+                # 5. AGRUPAR (CONDENSAR) POR MATERIAL
+                # Esto suma el mismo material si aparece en diferentes ítems del proyecto
+                reporte_final = reporte_detallado.groupby(['Nombre', 'Unidad', 'Rubro_Default'])['Total_Necesario'].sum().reset_index()
+                
+                # Dar formato visual
+                reporte_final = reporte_final.rename(columns={
+                    'Nombre': 'Insumo',
+                    'Rubro_Default': 'Rubro',
+                    'Total_Necesario': 'Cantidad Total'
+                })
+
+                # Ordenar por Rubro para que sea más legible
+                reporte_final = reporte_final.sort_values(by=['Rubro', 'Insumo'])
+
+                # MOSTRAR EN PANTALLA
+                st.write(f"### Listado Consolidado: {p_sel}")
+                st.dataframe(reporte_final, use_container_width=True, hide_index=True)
+
+                # 6. BOTÓN DE DESCARGA (Formato CSV compatible con Excel)
+                csv = reporte_final.to_csv(index=False).encode('utf-8-sig') # utf-8-sig para tildes en Excel
+                st.download_button(
+                    label="📥 Descargar Listado (Excel/CSV)",
+                    data=csv,
+                    file_name=f"Materiales_{p_sel}.csv",
+                    mime="text/csv",
+                )
+            else:
+                st.info("Este proyecto aún no tiene ítems con materiales asignados.")
     else:
-        st.info("No hay proyectos registrados aún.")
+        st.info("No hay proyectos registrados. Ve a la pestaña 'Gestión de Proyectos' para empezar.")
 
 # ---------------------------------------------------------
 # 6. SECCIÓN: EDICIÓN DE BASES (MATERIALES Y RECETAS)
