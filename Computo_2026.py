@@ -117,7 +117,7 @@ elif opcion == "📦 Gestionar Materiales":
                 n_mat = st.text_input("Nombre del Material (ej: Arena Lavada)")
                 rubro_sel = st.selectbox("Rubro", LISTA_RUBROS)
             with col2:
-                unidad = st.selectbox("Unidad", ["m3", "kg", "un", "lts", "m2", "gl", "barra"])
+                unidad = st.selectbox("Unidad", ["Bls","m3", "kg", "un", "lts", "m2", "gl", "barra","rollo","balde"])
                 costo = st.number_input("Costo Unitario ($)", min_value=0.0, step=0.1)
             
             if st.form_submit_button("Guardar Material"):
