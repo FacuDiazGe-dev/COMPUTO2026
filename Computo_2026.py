@@ -94,3 +94,55 @@ elif modo == "Cargar Ítems":
                 st.cache_data.clear() # Limpiar caché para que aparezca en el consolidado
             except Exception as e:
                 st.error(f"Error al guardar: {e}")
+#--------------------------------------------------------------------------------------
+
+# --- LÓGICA PARA TABLA VACÍA ---
+# Si el DF está vacío, creamos uno con las columnas necesarias para que el código no falle
+if df_proyectos.empty:
+    df_proyectos = pd.DataFrame(columns=['ID_PROY', 'NOMBRE', 'CLIENTE'])
+
+# --- MENÚ DE NAVEGACIÓN ---
+modo = st.sidebar.selectbox("Seleccionar Acción", 
+    ["📊 Ver Consolidado", "🏗️ Cargar Ítems", "➕ Crear Nuevo Proyecto"])
+
+# --- SECCIÓN: CREAR PROYECTO ---
+if modo == "➕ Crear Nuevo Proyecto":
+    st.header("Registrar Nuevo Proyecto")
+    with st.form("nuevo_proy_form", clear_on_submit=True):
+        nombre_proy = st.text_input("Nombre del Proyecto (ej: Edificio Alvear)")
+        cliente = st.text_input("Cliente")
+        
+        if st.form_submit_button("Guardar Proyecto"):
+            if nombre_proy:
+                # Generar un ID nuevo (el último + 1, o 1 si está vacío)
+                nuevo_id = 1 if df_proyectos.empty else int(df_proyectos['ID_PROY'].max()) + 1
+                
+                nueva_fila = [nuevo_id, nombre_proy, cliente]
+                
+                try:
+                    sh.get_worksheet_by_id(0).append_row(nueva_fila)
+                    st.success(f"Proyecto '{nombre_proy}' creado con éxito (ID: {nuevo_id})")
+                    st.cache_data.clear() # Forzamos recarga para que aparezca en los selectores
+                except Exception as e:
+                    st.error(f"Error al guardar: {e}")
+            else:
+                st.warning("El nombre del proyecto es obligatorio.")
+
+# --- SECCIÓN: VER CONSOLIDADO (CON PREVISIÓN DE VACÍO) ---
+elif modo == "📊 Ver Consolidado":
+    st.header("Consolidado de Proyecto")
+    
+    if df_proyectos.empty:
+        st.info("No hay proyectos registrados. Ve a 'Crear Nuevo Proyecto'.")
+    else:
+        proyecto_sel = st.selectbox("Seleccionar Proyecto", df_proyectos['NOMBRE'].unique())
+        # ... resto de tu código de cálculo ...
+
+# --- SECCIÓN: CARGAR ÍTEMS (CON PREVISIÓN DE VACÍO) ---
+elif modo == "🏗️ Cargar Ítems":
+    st.header("Asignar Ítems")
+    if df_proyectos.empty:
+        st.info("Primero debes crear un proyecto.")
+    else:
+        # ... tu formulario de carga de ítems ...
+        pass
