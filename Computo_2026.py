@@ -181,35 +181,36 @@ elif seccion == "Edición de Bases":
     
             if btn_receta:
                 if r_id and r_nombre:
-                    ws_rec = sh.get_worksheet_by_id(1931749204)
-                    ws_rec.append_row([r_id, r_nombre, r_rubro])
-                    st.success("✅ Ítem creado.")
-                    st.cache_data.clear()
-                    st.rerun()
+                    try:
+                        ws_rec = sh.get_worksheet_by_id(1931749204)
+                        ws_rec.append_row([r_id, r_nombre, r_rubro])
+                        st.success("✅ Ítem creado.")
+                        st.cache_data.clear()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error: {e}")
     
         st.divider()
 
-    # 1. BOTÓN DE REINICIO EN LA PARTE INFERIOR
-
-    col_t, col_b = st.columns([4, 1])
-    with col_b:
-        if st.button("🧹 Limpiar Pantalla"):
-            # Borramos las selecciones guardadas en la memoria de la sesión
-            for key in st.session_state.keys():
-                if "receta" in key or "mat" in key:
-                    del st.session_state[key]
-            st.rerun()
+        # 3. BOTÓN DE REINICIO Y SELECCIÓN
+        col_t, col_b = st.columns([4, 1])
+        with col_b:
+            if st.button("🧹 Limpiar Pantalla"):
+                for key in st.session_state.keys():
+                    if "receta" in key or "mat" in key:
+                        del st.session_state[key]
+                st.rerun()
             
-        # 3. ASIGNAR MATERIALES A RECETA
         st.subheader("🔗 Composición de la Receta")
-            if not df_recetas.empty:
-                # Usamos 'key' para que el botón de limpiar pueda resetearlo
-                receta_sel = st.selectbox(
-                    "Seleccione Ítem para editar su receta:", 
-                    df_recetas['Nombre_Item'].unique(),
-                    key="receta_activa"
-                )
-            # Extraemos el ID de forma segura como STRING
+        
+        if not df_recetas.empty:
+            receta_sel = st.selectbox(
+                "Seleccione Ítem para editar su receta:", 
+                df_recetas['Nombre_Item'].unique(),
+                key="receta_activa"
+            )
+            
+            # Extraemos el ID de forma segura
             id_receta_sel = str(df_recetas[df_recetas['Nombre_Item'] == receta_sel]['ID_Receta'].iloc[0])
     
             with st.form("form_agregar_material_receta", clear_on_submit=True):
@@ -219,15 +220,12 @@ elif seccion == "Edición de Bases":
                     mat_elegido = st.selectbox("Seleccionar Material:", mat_nombres)
                     id_mat_elegido = str(df_materiales[df_materiales['Nombre'] == mat_elegido]['ID_Material'].iloc[0])
                 
-                # ESTE BLOQUE DEBE ESTAR ALINEADO CON "with c1"
                 with c2:
                     cant_unitaria = st.number_input("Cantidad Unitaria (Incidencia)", min_value=0.000, format="%.3f", step=0.001)
                     factor_conv = st.number_input("Factor de Conversión (Divisor)", min_value=0.001, value=1.000, format="%.3f")
                 
-                # EL BOTÓN DEBE ESTAR DENTRO DEL "with st.form"
                 btn_add_mat = st.form_submit_button("Añadir Material")
 
-            # LA LÓGICA DE GUARDADO FUERA DEL FORMULARIO
             if btn_add_mat:
                 try:
                     ws_comp = sh.get_worksheet_by_id(50989702)
@@ -237,50 +235,32 @@ elif seccion == "Edición de Bases":
                     st.rerun()
                 except Exception as e:
                     st.error(f"Error: {e}")
-            # 3. BOTÓN DE CIERRE DE EDICIÓN AL FINAL
-            st.divider()
-            if st.button("✅ Finalizar Edición de este Ítem"):
-                st.success("Ítem guardado en base. Limpiando selección...")
-                # Forzamos la limpieza del caché y el reinicio
-                st.cache_data.clear()
-                # Usamos un pequeño truco para resetear el selectbox
-                st.session_state.receta_activa = df_recetas['Nombre_Item'].unique()[0] 
-                st.rerun()
 
-    # 4. VISUALIZACIÓN DEL DETALLE (Con cálculo de Factor aplicado)
-    st.write(f"**Insumos en: {receta_sel}**")
-    
-    if not df_composicion.empty and 'ID_Receta' in df_composicion.columns:
-        # 1. Limpieza y preparación de datos
-        df_composicion['ID_Receta'] = df_composicion['ID_Receta'].astype(str)
-        id_receta_sel_str = str(id_receta_sel) # Aseguramos que sea string
-        
-        # 2. Filtrar materiales de la receta seleccionada
-        detalle = df_composicion[df_composicion['ID_Receta'] == id_receta_sel_str].copy()
-        
-        if not detalle.empty:
-            # 3. Asegurar que las columnas numéricas sean tratadas como tales
-            detalle['Cantidad_Unitaria'] = pd.to_numeric(detalle['Cantidad_Unitaria'], errors='coerce')
-            detalle['Factor'] = pd.to_numeric(detalle['Factor'], errors='coerce').fillna(1)
+            # 4. VISUALIZACIÓN DEL DETALLE
+            st.divider()
+            st.write(f"**Insumos actuales en: {receta_sel}**")
             
-            # 4. APLICAR LA DIVISIÓN PARA MOSTRAR LA CANTIDAD FINAL
-            detalle['Cantidad_Calculada'] = detalle['Cantidad_Unitaria'] / detalle['Factor']
-            
-            # 5. Unir con nombres de materiales
-            df_materiales['ID_Material'] = df_materiales['ID_Material'].astype(str)
-            resumen = detalle.merge(df_materiales[['ID_Material', 'Nombre', 'Unidad']], on='ID_Material', how='left')
-            
-            # 6. Mostrar la tabla con la columna ya calculada
-            # Cambiamos el nombre de la columna para que el usuario entienda qué ve
-            resumen = resumen.rename(columns={'Cantidad_Calculada': 'Cant. Real (incidencia)'})
-            
-            st.dataframe(
-                resumen[['Nombre', 'Cant. Real (incidencia)', 'Unidad']], 
-                use_container_width=True, 
-                hide_index=True
-            )
+            if not df_composicion.empty and 'ID_Receta' in df_composicion.columns:
+                df_composicion['ID_Receta'] = df_composicion['ID_Receta'].astype(str)
+                detalle = df_composicion[df_composicion['ID_Receta'] == id_receta_sel].copy()
+                
+                if not detalle.empty:
+                    detalle['Cantidad_Unitaria'] = pd.to_numeric(detalle['Cantidad_Unitaria'], errors='coerce')
+                    detalle['Factor'] = pd.to_numeric(detalle['Factor'], errors='coerce').fillna(1)
+                    detalle['Cant. Real'] = detalle['Cantidad_Unitaria'] / detalle['Factor']
+                    
+                    df_materiales['ID_Material'] = df_materiales['ID_Material'].astype(str)
+                    resumen = detalle.merge(df_materiales[['ID_Material', 'Nombre', 'Unidad']], on='ID_Material', how='left')
+                    
+                    st.dataframe(resumen[['Nombre', 'Cant. Real', 'Unidad']], use_container_width=True, hide_index=True)
+                else:
+                    st.info("Sin materiales aún.")
+
+            if st.button("✅ Finalizar Edición de este Ítem"):
+                st.cache_data.clear()
+                st.rerun()
         else:
-            st.info("No hay materiales en esta receta.")
+            st.info("Crea un Ítem primero para empezar a cargar materiales.")
 
 # ---------------------------------------------------------
 # 7. SECCIÓN: GESTIÓN DE PROYECTOS (CARGA Y EDICIÓN)
