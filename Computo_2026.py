@@ -102,12 +102,45 @@ elif opcion == "🏗️ Gestionar Ítems":
 
 # --- MÓDULO 4: GESTIONAR MATERIALES ---
 elif opcion == "📦 Gestionar Materiales":
-    st.subheader("Catálogo de Materiales")
+    st.subheader("Catálogo Maestro de Materiales")
+    
+    # Carga de datos actuales
     df_mat = load_data(1931749204)
-    if df_mat.empty:
-        st.info("No hay materiales registrados.")
-    else:
+    
+    # Formulario para agregar nuevo material
+    with st.expander("➕ Agregar Nuevo Material al Catálogo", expanded=df_mat.empty):
+        with st.form("form_nuevo_material", clear_on_submit=True):
+            col1, col2, col3 = st.columns([2, 1, 1])
+            with col1:
+                n_mat = st.text_input("Nombre del Material (ej: Arena Lavada)")
+            with col2:
+                unidad = st.selectbox("Unidad", ["m3", "kg", "un", "lts", "m2", "gl"])
+            with col3:
+                costo = st.number_input("Costo Unitario ($)", min_value=0.0, step=0.1)
+            
+            if st.form_submit_button("Guardar Material"):
+                if n_mat:
+                    # Generar ID_MAT (Máximo + 1)
+                    nuevo_id_m = 1 if df_mat.empty else int(df_mat['ID_MAT'].max()) + 1
+                    
+                    nueva_fila_mat = [nuevo_id_m, n_mat, unidad, costo]
+                    
+                    try:
+                        sh.get_worksheet_by_id(1931749204).append_row(nueva_fila_mat)
+                        st.success(f"✅ '{n_mat}' agregado al catálogo.")
+                        st.cache_data.clear()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al guardar: {e}")
+                else:
+                    st.warning("El nombre del material es obligatorio.")
+
+    # Visualización de la tabla
+    if not df_mat.empty:
+        st.write("### Materiales Registrados")
         st.dataframe(df_mat, use_container_width=True, hide_index=True)
+    else:
+        st.info("El catálogo está vacío. Utiliza el formulario de arriba para empezar.")
 
 # --- MÓDULO 5: CONSOLIDADO FINAL ---
 elif opcion == "📊 Consolidado Final":
