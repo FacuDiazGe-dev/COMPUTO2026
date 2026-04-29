@@ -263,86 +263,87 @@ elif seccion == "Edición de Bases":
             st.info("Crea un Ítem primero para empezar a cargar materiales.")
 
 # ---------------------------------------------------------
-# 7. SECCIÓN: GESTIÓN DE PROYECTOS (CARGA Y EDICIÓN)
+# 7. SECCIÓN: GESTIÓN DE PROYECTOS (FLUJO UNIFICADO)
 # ---------------------------------------------------------
 elif seccion == "Gestión de Proyectos":
     st.header("🛠️ Operación de Proyectos")
     
     # 1. CARGAR DATOS
-    df_proy_items = load_data(1900275728) # Proyectos_Items
-    df_recetas = load_data(1931749204)    # Recetas_Global
+    df_proy_items = load_data(1900275728) # Proyectos_Items (Detalle)
+    df_recetas = load_data(1931749204)    # Recetas_Global (Maestro)
     
-    # 2. FORMULARIO: ASIGNAR ÍTEM A PROYECTO
-    with st.expander("➕ Cargar Ítem a un Proyecto", expanded=True):
-        with st.form("form_proy_items", clear_on_submit=True):
-            col1, col2 = st.columns(2)
-            with col1:
-                p_nombre = st.text_input("Nombre del Proyecto (ej: Casa Perez)")
-                p_id = st.text_input("ID Proyecto (ej: P-001)")
-            
-            with col2:
-                # Seleccionamos la Receta
-                receta_nombres = df_recetas['Nombre_Item'].tolist() if not df_recetas.empty else []
-                item_elegido = st.selectbox("Seleccionar Ítem (Receta Global):", receta_nombres)
-                
-                # Buscamos la unidad de la receta elegida para informar al usuario
-                unidad_sugerida = ""
-                if item_elegido:
-                    unidad_sugerida = df_recetas[df_recetas['Nombre_Item'] == item_elegido]['Unidad'].iloc[0]
-                
-                p_computo = st.number_input(f"Cómputo / Cantidad ({unidad_sugerida}):", min_value=0.01, format="%.2f")
-            
-            btn_guardar_proy = st.form_submit_button("Cargar Ítem al Proyecto")
+    # Usamos una técnica para obtener proyectos únicos de la tabla
+    proyectos_existentes = []
+    if not df_proy_items.empty:
+        proyectos_existentes = df_proy_items['Nombre_Proyecto'].unique().tolist()
 
-        if btn_guardar_proy:
-            if p_id and item_elegido:
-                try:
-                    # Obtenemos el ID de la receta de forma segura
-                    id_rec_elegida = str(df_recetas[df_recetas['Nombre_Item'] == item_elegido]['ID_Receta'].iloc[0])
-                    
-                    ws_proy = sh.get_worksheet_by_id(1900275728)
-                    # Guardamos: ID_PROY | NOMBRE_PROY | ID_RECETA | COMPUTO
-                    ws_proy.append_row([p_id, p_nombre, id_rec_elegida, p_computo])
-                    
-                    st.success(f"✅ Ítem '{item_elegido}' ({p_computo} {unidad_sugerida}) cargado a {p_nombre}")
-                    st.cache_data.clear()
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error al guardar: {e}")
-            else:
-                st.warning("⚠️ Completa el ID de Proyecto y selecciona un Ítem.")
+    # 2. PARTE A: CREAR UN PROYECTO NUEVO
+    with st.expander("🏗️ Registrar Nuevo Proyecto"):
+        with st.form("form_nuevo_proy", clear_on_submit=True):
+            n_p_id = st.text_input("ID Proyecto (ej: P-01)")
+            n_p_nombre = st.text_input("Nombre del Proyecto (ej: Edificio Norte)")
+            btn_crear_proy = st.form_submit_button("Dar de Alta Proyecto")
+            
+            if btn_crear_proy and n_p_id and n_p_nombre:
+                # Cargamos una fila "semilla" para que el proyecto exista
+                ws_proy = sh.get_worksheet_by_id(1900275728)
+                ws_proy.append_row([n_p_id, n_p_nombre, "INICIO", 0])
+                st.success(f"Proyecto {n_p_nombre} creado correctamente.")
+                st.cache_data.clear()
+                st.rerun()
 
     st.divider()
 
-    # 3. REVISIÓN Y EDICIÓN DE ÍTEMS CARGADOS
-    st.subheader("📋 Revisión de Ítems por Proyecto")
-    if not df_proy_items.empty:
-        proy_lista = df_proy_items['Nombre_Proyecto'].unique()
-        p_ver = st.selectbox("Seleccione Proyecto para ver sus ítems:", proy_lista)
+    # 3. PARTE B: CARGAR ITEMS AL PROYECTO SELECCIONADO
+    if proyectos_existentes:
+        st.subheader("📝 Carga de Ítems por Obra")
         
-        # Filtramos la tabla del proyecto
-        vista_proy = df_proy_items[df_proy_items['Nombre_Proyecto'] == p_ver].copy()
+        # Seleccionamos el proyecto UNA SOLA VEZ
+        p_seleccionado = st.selectbox("Seleccione el Proyecto para trabajar:", proyectos_existentes, key="p_activo")
         
-        # Unimos con recetas para traer el Nombre, Rubro y la nueva columna UNIDAD
-        if not df_recetas.empty:
-            df_recetas['ID_Receta'] = df_recetas['ID_Receta'].astype(str)
-            vista_proy['ID_Receta'] = vista_proy['ID_Receta'].astype(str)
-            vista_proy = vista_proy.merge(df_recetas[['ID_Receta', 'Nombre_Item', 'Rubro', 'Unidad']], on='ID_Receta', how='left')
+        # Obtenemos el ID del proyecto seleccionado
+        p_id_actual = df_proy_items[df_proy_items['Nombre_Proyecto'] == p_seleccionado]['ID_Proyecto'].iloc[0]
+
+        with st.form("form_items_obra", clear_on_submit=True):
+            c1, c2 = st.columns(2)
+            with c1:
+                receta_nombres = df_recetas['Nombre_Item'].tolist() if not df_recetas.empty else []
+                item_ele = st.selectbox("Seleccionar Ítem de la Biblioteca:", receta_nombres)
+            with c2:
+                # Mostrar unidad de referencia
+                uni_ref = df_recetas[df_recetas['Nombre_Item'] == item_ele]['Unidad'].iloc[0] if item_ele else "-"
+                cant_obra = st.number_input(f"Cantidad / Cómputo ({uni_ref})", min_value=0.0, step=0.1, format="%.2f")
             
-        st.write(f"Listado de tareas para: **{p_ver}**")
-        st.dataframe(vista_proy[['Nombre_Item', 'Rubro', 'Computo', 'Unidad']], use_container_width=True, hide_index=True)
-        
-        # Opción propositiva: Botón para borrar el último ítem cargado por error
-        if st.button("🗑️ Borrar último ítem cargado"):
-            ws_proy = sh.get_worksheet_by_id(1900275728)
-            all_rows = ws_proy.get_all_values()
-            if len(all_rows) > 1:
-                ws_proy.delete_rows(len(all_rows))
-                st.warning("Última fila eliminada.")
+            btn_cargar_item = st.form_submit_button("Añadir Ítem a la Obra")
+
+        if btn_cargar_item and item_ele:
+            try:
+                id_rec_ele = str(df_recetas[df_recetas['Nombre_Item'] == item_ele]['ID_Receta'].iloc[0])
+                ws_proy = sh.get_worksheet_by_id(1900275728)
+                # Guardamos: ID_PROY | NOMBRE_PROY | ID_RECETA | COMPUTO
+                ws_proy.append_row([p_id_actual, p_seleccionado, id_rec_ele, cant_obra])
+                st.success(f"✅ {item_ele} añadido a {p_seleccionado}")
                 st.cache_data.clear()
                 st.rerun()
+            except Exception as e:
+                st.error(f"Error: {e}")
+
+        # 4. VISTA PREVIA DE LO CARGADO EN ESTE PROYECTO
+        st.write(f"**Ítems cargados en {p_seleccionado}:**")
+        v_p = df_proy_items[df_proy_items['Nombre_Proyecto'] == p_seleccionado].copy()
+        # Filtramos la fila "INICIO" para que no ensucie la vista
+        v_p = v_p[v_p['ID_Receta'] != "INICIO"]
+        
+        if not v_p.empty and not df_recetas.empty:
+            df_recetas['ID_Receta'] = df_recetas['ID_Receta'].astype(str)
+            v_p['ID_Receta'] = v_p['ID_Receta'].astype(str)
+            v_p = v_p.merge(df_recetas[['ID_Receta', 'Nombre_Item', 'Unidad', 'Rubro']], on='ID_Receta', how='left')
+            st.dataframe(v_p[['Nombre_Item', 'Rubro', 'Computo', 'Unidad']], use_container_width=True, hide_index=True)
+            
+            if st.button("🏁 Finalizar Carga de este Proyecto"):
+                st.info("Carga completada. Puedes ver el informe en la pestaña de Inicio.")
     else:
-        st.info("No hay ítems cargados aún.")
+        st.warning("Aún no hay proyectos creados. Usa el formulario de arriba.")
 
 
 
