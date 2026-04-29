@@ -18,15 +18,23 @@ def load_data(gid, sheet_id, client):
 
 # 3. Caching
 
-@st.cache_data(ttl=600)  # Los datos se guardan 10 min en memoria
+@st.cache_resource
+def get_gsheet_client():
+    scope = ["https://googleapis.com", "https://googleapis.com"]
+    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
+    return gspread.authorize(creds)
+
+# 4. Función de carga ajustada (quitamos 'client' de los argumentos)
+@st.cache_data(ttl=600)
 def load_data(gid, sheet_id):
-    client = get_gsheet_client() # Conectar dentro para que el cliente sea parte del flujo cacheado
+    # Obtenemos el cliente aquí adentro
+    client = get_gsheet_client() 
     sh = client.open_by_key(sheet_id)
     worksheet = sh.get_worksheet_by_id(gid)
     return pd.DataFrame(worksheet.get_all_records())
 
 # --- INICIO DE LA APP ---
-client = get_gsheet_client()
+
 sheet_id = "12plATZeI3STturtJtMog24m-e-WNGr1KcAOWQRuvVO0"
 
 # Carga de datos inicial
