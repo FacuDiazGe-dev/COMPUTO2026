@@ -41,10 +41,10 @@ modo = st.sidebar.radio("Navegación", ["Ver Consolidado", "Cargar Ítems"])
 
 if modo == "Ver Consolidado":
     st.header("Consolidado de Proyecto")
-    proyecto_sel = st.selectbox("Seleccionar Proyecto", df_proyectos['N_PROY'].unique())
+    proyecto_sel = st.selectbox("Seleccionar Proyecto", df_proyectos['NOMBRE'].unique())
     
     if st.button("Generar Listado"):
-        id_p = df_proyectos.loc[df_proyectos['N_PROY'] == proyecto_sel, 'ID_PROY'].values[0]
+        id_p = df_proyectos.loc[df_proyectos['NOMBRE'] == proyecto_sel, 'ID_PROY'].values[0]
         
         # Filtrar detalle y calcular
         det = df_proy_detalle[df_proy_detalle['ID_PROY'] == id_p].copy()
@@ -73,7 +73,7 @@ elif modo == "Cargar Ítems":
     st.header("Asignar Nuevo Ítem a Proyecto")
     
     with st.form("form_carga", clear_on_submit=True):
-        p_sel = st.selectbox("Proyecto", df_proyectos['N_PROY'].unique())
+        p_sel = st.selectbox("Proyecto", df_proyectos['NOMBRE'].unique())
         i_sel = st.selectbox("Ítem de Obra", df_items['N_ITEM'].unique())
         cant = st.number_input("Cantidad (Cómputo)", min_value=0.0, step=0.1)
         
@@ -82,7 +82,7 @@ elif modo == "Cargar Ítems":
         if btn_guardar:
             try:
                 # Obtener IDs
-                id_p = df_proyectos.loc[df_proyectos['N_PROY'] == p_sel, 'ID_PROY'].values[0]
+                id_p = df_proyectos.loc[df_proyectos['NOMBREY'] == p_sel, 'ID_PROY'].values[0]
                 id_i = df_items.loc[df_items['N_ITEM'] == i_sel, 'ID_ITEM'].values[0]
                 
                 # Preparar fila (Ajusta el orden según tus columnas en Google Sheets)
