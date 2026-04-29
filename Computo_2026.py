@@ -38,10 +38,10 @@ def load_data(gid, sheet_id):
 sheet_id = "12plATZeI3STturtJtMog24m-e-WNGr1KcAOWQRuvVO0"
 
 # Carga de datos inicial
-df_proyectos = load_data(0, sheet_id, client)
-df_materiales = load_data(1931749204, sheet_id, client)
-df_items = load_data(50989702, sheet_id, client)
-df_proy_detalle = load_data(1900275728, sheet_id, client)
+df_proyectos = load_data(0, sheet_id)
+df_materiales = load_data(1931749204, sheet_id)
+df_items = load_data(50989702, sheet_id)
+df_proy_detalle = load_data(1900275728, sheet_id)
 
 st.title("Gestor de Materiales 2026")
 
