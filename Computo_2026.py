@@ -87,13 +87,6 @@ elif seccion == "Edición de Bases":
     st.header("🧠 Repertorio Global")
     tab1, tab2 = st.tabs(["🛒 Catálogo de Materiales", "🍱 Recetas de Ítems"])
     
-# ---------------------------------------------------------
-# 6. SECCIÓN: EDICIÓN DE BASES (MATERIALES Y RECETAS)
-# ---------------------------------------------------------
-elif seccion == "Edición de Bases":
-    st.header("🧠 Repertorio Global")
-    tab1, tab2 = st.tabs(["🛒 Catálogo de Materiales", "🍱 Recetas de Ítems"])
-    
     # -----------------------------------------------------
     # 6.a APARTADO MATERIALES: Visualización y Carga
     # -----------------------------------------------------
