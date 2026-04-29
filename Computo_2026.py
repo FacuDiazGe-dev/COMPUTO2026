@@ -3,75 +3,79 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 
-# 1. Configuración de página
-st.set_page_config(page_title="Gestor de Materiales 2026", layout="wide")
+# 1. Configuración y Conexión
+st.set_page_config(page_title="Gestor Materiales 2026", layout="wide")
 
-# 2. Conexión Silenciosa
 @st.cache_resource
 def get_client():
     creds_dict = dict(st.secrets.connections.gsheets)
     creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-    scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    scopes = ["https://googleapis.com", "https://googleapis.com"]
     creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
     return gspread.authorize(creds)
 
 client = get_client()
-url_real = "https://docs.google.com/spreadsheets/d/12plATZeI3STturtJtMog24m-e-WNGr1KcAOWQRuvVO0/"
+url_real = "https://google.com"
 sh = client.open_by_url(url_real)
 
-# 3. Funciones de carga con caché (usando nombres corregidos)
-@st.cache_data(ttl=600)
-def load_data(worksheet_name):
-    try:
-        ws = sh.worksheet(worksheet_name)
-        return pd.DataFrame(ws.get_all_records())
-    except:
-        return pd.DataFrame()
+# 2. Función de carga genérica
+@st.cache_data(ttl=60)
+def load_data(gid):
+    ws = sh.get_worksheet_by_id(gid)
+    data = ws.get_all_records()
+    return pd.DataFrame(data)
 
-# Carga inicial
-df_proyectos = load_data("PROYECTOS")
-df_materiales = load_data("M_MATERIALES")
-df_items = load_data("ITEMS")
-df_proy_detalle = load_data("PROY_DETALLE")
+# --- NAVEGACIÓN (Botonera Lateral) ---
+st.sidebar.title("Menú de Gestión")
+opcion = st.sidebar.selectbox("Seleccione una opción", [
+    "📁 Ver Proyectos", 
+    "➕ Crear Proyecto", 
+    "🏗️ Gestionar Ítems", 
+    "📦 Gestionar Materiales",
+    "📊 Consolidado Final"
+])
 
-# Previsión de tabla vacía
-if df_proyectos.empty:
-    df_proyectos = pd.DataFrame(columns=['ID_PROY', 'NOMBRE', 'CLIENTE'])
+st.title(f"Gestor 2026 > {opcion}")
 
-# --- INTERFAZ ---
-st.title("🏗️ Gestor de Materiales 2026")
-
-# UN SOLO MENÚ DE NAVEGACIÓN
-modo = st.sidebar.selectbox("Seleccionar Acción", 
-    ["📊 Ver Consolidado", "🏗️ Cargar Ítems", "➕ Crear Nuevo Proyecto"])
-
-# 3. SECCIÓN: VER CONSOLIDADO
-elif modo == "📊 Ver Consolidado":
-    st.header("Consolidado de Proyecto")
-    
-    if df_proyectos.empty:
-        st.info("Aún no has creado ningún proyecto. Ve a la sección '➕ Crear Nuevo Proyecto'.")
+# --- MÓDULO 1: VER PROYECTOS ---
+if opcion == "📁 Ver Proyectos":
+    df_proy = load_data(0) # GID 0
+    if df_proy.empty:
+        st.info("No hay proyectos registrados actualmente.")
     else:
-        # El selector y el botón aparecen ANTES de validar los datos detalle
-        proyecto_sel = st.selectbox("Seleccionar Proyecto", df_proyectos['NOMBRE'].unique())
-        
-        if st.button("🔍 Generar Listado"):
-            id_p = df_proyectos.loc[df_proyectos['NOMBRE'] == proyecto_sel, 'ID_PROY'].values[0]
-            
-            # Buscamos si hay algo en detalle para ese ID específico
-            if not df_proy_detalle.empty:
-                det = df_proy_detalle[df_proy_detalle['ID_PROY'] == id_p].copy()
-                
-                if not det.empty:
-                    # Lógica de cálculo (Merge y sumatorias)
-                    merged = det.merge(df_items, on='ID_ITEM')
-                    merged['CANT_TOTAL_MAT'] = merged['COMPUTO'] * merged['C_MAT']
-                    resumen = merged.groupby('ID_MAT')['CANT_TOTAL_MAT'].sum().reset_index()
-                    final = resumen.merge(df_materiales, on='ID_MAT')
-                    
-                    st.subheader(f"Lista de Materiales - {proyecto_sel}")
-                    st.dataframe(final[['N_MAT', 'CANT_TOTAL_MAT', 'UNIDAD', 'COSTO_UNITARIO']], use_container_width=True)
-                else:
-                    st.warning(f"El proyecto '{proyecto_sel}' aún no tiene ítems cargados. Ve a '🏗️ Cargar Ítems'.")
-            else:
-                st.warning("La tabla de detalles está totalmente vacía. Empieza cargando ítems a tus proyectos.")
+        st.dataframe(df_proy, use_container_width=True, hide_index=True)
+
+# --- MÓDULO 2: CREAR PROYECTO ---
+elif opcion == "➕ Crear Proyecto":
+    with st.form("form_nuevo_proy", clear_on_submit=True):
+        st.subheader("Datos del nuevo proyecto")
+        nombre = st.text_input("Nombre del Proyecto")
+        cliente = st.text_input("Cliente")
+        if st.form_submit_button("Guardar Proyecto"):
+            # Lógica para ID y append_row aquí...
+            st.success("Listo para programar el guardado de Proyecto")
+
+# --- MÓDULO 3: GESTIONAR ÍTEMS ---
+elif opcion == "🏗️ Gestionar Ítems":
+    st.subheader("Configuración de Ítems de Obra")
+    df_items = load_data(50989702)
+    if df_items.empty:
+        st.info("No hay ítems cargados.")
+    else:
+        st.dataframe(df_items, use_container_width=True)
+    # Aquí irá el formulario para crear un Ítem (ID_ITEM, N_ITEM, etc.)
+
+# --- MÓDULO 4: GESTIONAR MATERIALES ---
+elif opcion == "📦 Gestionar Materiales":
+    st.subheader("Base de Datos de Materiales")
+    df_mat = load_data(1931749204)
+    if df_mat.empty:
+        st.info("La lista de materiales está vacía.")
+    else:
+        st.dataframe(df_mat, use_container_width=True)
+    # Aquí irá el formulario para crear Material (ID_MAT, N_MAT, UNIDAD...)
+
+# --- MÓDULO 5: CONSOLIDADO FINAL ---
+elif opcion == "📊 Consolidado Final":
+    st.subheader("Cálculo de Consumo por Proyecto")
+    # Aquí irá tu lógica de merge y multiplicaciones que ya probamos
