@@ -56,6 +56,10 @@ with st.sidebar:
         ["Inicio", "Edición de Bases", "Gestión de Proyectos"]
     )
     st.divider()
+    # BOTÓN DE ACTUALIZACIÓN FORZADA
+    if st.button("🔄 Actualizar Datos del Excel"):
+        st.cache_data.clear()
+        st.rerun()
     st.info("Sistema de Cómputo de Materiales v1.0")
 
 # ---------------------------------------------------------
@@ -93,10 +97,10 @@ elif seccion == "Edición de Bases":
     with tab1:
         st.subheader("Gestión de Insumos")
         
-        # Cargar datos actuales
+        # 1. CARGAR DATOS ACTUALES
         df_mat = load_data(0)
         
-        # Formulario de carga
+        # 2. FORMULARIO DE CARGA (DENTRO DEL EXPANDER)
         with st.expander("➕ Registrar Nuevo Material", expanded=False):
             with st.form("form_nuevo_material", clear_on_submit=True):
                 col1, col2 = st.columns(2)
@@ -106,31 +110,49 @@ elif seccion == "Edición de Bases":
                 with col2:
                     nueva_unidad = st.text_input("Unidad (ej: kg, m3, unidad)")
                     nuevo_rubro = st.selectbox("Rubro Predeterminado", 
-                        ["Albañilería", "Electricidad", "Plomería", "Estructura", "Terminaciones", "Aridos","Otros"])
+                        ["Albañilería", "Electricidad", "Plomería", "Estructura", "Terminaciones", "Aridos", "Otros"])
                 
                 btn_guardar_mat = st.form_submit_button("Guardar Material")
 
-                if btn_guardar_mat:
-                    if nuevo_id and nuevo_nombre and nueva_unidad:
-                        try:
-                            # Acceder a la hoja específica (GID 0)
-                            ws_mat = sh.get_worksheet_by_id(0)
-                            # Preparar la fila
-                            nueva_fila = [nuevo_id, nuevo_nombre, nueva_unidad, nuevo_rubro]
-                            # Insertar en GSheets
-                            ws_mat.append_row(nueva_fila)
-                            
-                            st.success(f"✅ Material '{nuevo_nombre}' guardado correctamente.")
-                            st.cache_data.clear() # Limpiamos caché para ver el cambio
-                            st.rerun() 
-                        except Exception as e:
-                            st.error(f"Error al guardar: {e}")
-                    else:
-                        st.warning("⚠️ Por favor, completa los campos obligatorios (ID, Nombre y Unidad).")
+            # Lógica de guardado (DENTRO del expander, pero FUERA del form)
+            if btn_guardar_mat:
+                if nuevo_id and nuevo_nombre and nueva_unidad:
+                    try:
+                        ws_mat = sh.get_worksheet_by_id(0)
+                        nueva_fila = [nuevo_id, nuevo_nombre, nueva_unidad, nuevo_rubro]
+                        ws_mat.append_row(nueva_fila)
+                        st.success(f"✅ Material '{nuevo_nombre}' guardado.")
+                        st.cache_data.clear()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+                else:
+                    st.warning("⚠️ Completa los campos obligatorios.")
 
-        # Visualización de la tabla
+        # 3. MODO EDICIÓN Y VISUALIZACIÓN
         if not df_mat.empty:
-            st.dataframe(df_mat, use_container_width=True, hide_index=True)
+            st.write("💡 *Edita directamente en la tabla y presiona el botón inferior para guardar cambios.*")
+            
+            # Editor de datos (Reemplaza al dataframe simple)
+            df_editado = st.data_editor(
+                df_mat, 
+                use_container_width=True, 
+                hide_index=True,
+                key="editor_materiales"
+            )
+            
+            # Botón para confirmar cambios en la tabla
+            if st.button("💾 Guardar Cambios en Tabla"):
+                try:
+                    ws_mat = sh.get_worksheet_by_id(0)
+                    # Preparamos los datos: Encabezados + Filas
+                    data_to_update = [df_editado.columns.values.tolist()] + df_editado.values.tolist()
+                    ws_mat.update(data_to_update) # Esto pisa la hoja con lo nuevo
+                    st.success("✅ Base de materiales actualizada.")
+                    st.cache_data.clear()
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al actualizar: {e}")
         else:
             st.info("El catálogo está vacío.")
         
