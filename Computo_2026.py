@@ -31,7 +31,7 @@ def load_data(worksheet_name):
 
 # Carga inicial de DataFrames
 df_proyectos = load_data("PROYECTOS")
-df_materiales = load_data("MATERIALES")
+df_materiales = load_data("M_MATERIALES")
 df_items = load_data("ITEMS")
 df_proy_detalle = load_data("DETALLE_PROY")
 
