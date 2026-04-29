@@ -7,7 +7,7 @@ from google.oauth2.service_account import Credentials
 st.set_page_config(page_title="Gestor Materiales 2026", layout="wide")
 
 # Centralizamos la URL (Asegúrate de que este sea el ID correcto de tu Sheet)
-SHEET_URL = "https://google.com"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/12plATZeI3STturtJtMog24m-e-WNGr1KcAOWQRuvVO0"
 
 @st.cache_resource
 def get_client():
