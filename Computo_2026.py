@@ -313,28 +313,65 @@ elif opcion == "📦 Gestionar Materiales":
         st.dataframe(df_visual[cols_presentes], use_container_width=True, hide_index=True)
 
 # --- MÓDULO 5: CONSOLIDADO FINAL ---
+# --- MÓDULO 5: CONSOLIDADO FINAL ---
 elif opcion == "📊 Consolidado Final":
-    st.header("Cálculo de Insumos")
+    st.header("📊 Resumen de Materiales por Proyecto")
+    
+    # 1. Carga de todas las bases necesarias
     df_proy = load_data(0)
-    df_items = load_data(50989702)
-    df_materiales = load_data(1931749204)
-    df_proy_detalle = load_data(1900275728)
+    df_mat_maestro = load_data(1931749204)  # M_MATERIALES
+    df_items_recetas = load_data(50989702)  # ITEMS (Recetas)
+    df_computos = load_data(1900275728)      # PROY_DETALLE (Cómputos)
 
-    if df_proy.empty or df_proy_detalle.empty:
-        st.warning("No hay datos suficientes (proyectos o ítems cargados).")
+    if df_computos.empty or df_items_recetas.empty:
+        st.warning("⚠️ No hay cómputos cargados o recetas definidas para generar un reporte.")
     else:
         proy_sel = st.selectbox("Seleccionar Proyecto", df_proy['NOMBRE'].unique())
-        if st.button("🔍 Generar Reporte"):
-            # Lógica de cálculo
-            id_p = df_proy.loc[df_proy['NOMBRE'] == proy_sel, 'ID_PROY'].values[0]
-            det = df_proy_detalle[df_proy_detalle['ID_PROY'] == id_p].copy()
+        
+        if st.button("🚀 Calcular Listado de Materiales"):
+            # A. Obtener ID del proyecto
+            id_p = int(df_proy.loc[df_proy['NOMBRE'] == proy_sel, 'ID_PROY'].values[0])
             
-            if not det.empty:
-                merged = det.merge(df_items, on='ID_ITEM')
-                merged['CANT_TOTAL_MAT'] = merged['COMPUTO'] * merged['C_MAT']
-                resumen = merged.groupby('ID_MAT')['CANT_TOTAL_MAT'].sum().reset_index()
-                final = resumen.merge(df_materiales, on='ID_MAT')
-                
-                st.dataframe(final[['N_MAT', 'CANT_TOTAL_MAT', 'UNIDAD', 'COSTO_UNITARIO']], use_container_width=True)
+            # B. Filtrar cómputos del proyecto
+            mis_computos = df_computos[df_computos['ID_PROY'] == id_p].copy()
+            
+            if mis_computos.empty:
+                st.error("Este proyecto no tiene ítems asignados.")
             else:
-                st.info("Este proyecto aún no tiene ítems asignados.")
+                # C. Vincular Cómputos con Recetas (Trae ID_MAT y C_MAT)
+                # Usamos merge por ID_ITEM
+                df_unificado = mis_computos.merge(df_items_recetas, on='ID_ITEM', how='inner')
+                
+                # D. Cálculo de cantidades totales
+                # Cantidad Total = Cantidad de Obra (COMPUTO) * Coeficiente Material (C_MAT)
+                df_unificado['TOTAL_INSUMO'] = df_unificado['COMPUTO'] * df_unificado['C_MAT']
+                
+                # E. Agrupar por Material (por si varios ítems usan el mismo material)
+                resumen_insumos = df_unificado.groupby('ID_MAT')['TOTAL_INSUMO'].sum().reset_index()
+                
+                # F. Traer nombres y unidades desde el maestro de materiales
+                final = resumen_insumos.merge(df_mat_maestro, on='ID_MAT', how='left')
+                
+                # --- CORRECCIÓN DE NOMBRES DE COLUMNAS ---
+                # Detectamos qué columnas existen realmente para evitar el KeyError
+                col_nombre_mat = 'NOMBRE' if 'NOMBRE' in final.columns else 'N_MAT'
+                
+                st.subheader(f"Listado para: {proy_sel}")
+                
+                # Definimos qué mostrar según lo que exista en tu GSheet
+                columnas_ver = [col_nombre_mat, 'TOTAL_INSUMO', 'UNIDAD']
+                # Si agregaste RUBRO, lo incluimos
+                if 'RUBRO' in final.columns: columnas_ver.append('RUBRO')
+                
+                # Filtramos solo las que existen para el dataframe
+                cols_finales = [c for c in columnas_ver if c in final.columns]
+                
+                st.dataframe(
+                    final[cols_finales].sort_values(by=cols_finales[-1] if 'RUBRO' in cols_finales else col_nombre_mat),
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+                # Opción de descarga
+                csv = final[cols_finales].to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Descargar CSV", csv, f"Consolidado_{proy_sel}.csv", "text/csv").")
