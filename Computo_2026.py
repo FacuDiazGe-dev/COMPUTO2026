@@ -102,34 +102,35 @@ elif opcion == "🏗️ Gestionar Ítems":
 
 # --- MÓDULO 4: GESTIONAR MATERIALES ---
 elif opcion == "📦 Gestionar Materiales":
-    st.subheader("Maestro de Materiales por Rubro")
+    st.subheader("Catálogo Maestro de Materiales")
     
-    # Carga de datos actuales
     df_mat = load_data(1931749204)
     
-    # Lista de Rubros sugeridos (puedes agregar los que necesites)
     LISTA_RUBROS = ["Cementos", "Áridos", "Metales", "Albañilería", "Chapas", "Aislaciones", "Instalaciones", "Otros"]
     
     with st.expander("➕ Agregar Nuevo Material al Catálogo", expanded=df_mat.empty):
         with st.form("form_nuevo_material", clear_on_submit=True):
             col1, col2 = st.columns(2)
             with col1:
-                n_mat = st.text_input("Nombre del Material (ej: Arena Lavada)")
+                n_mat = st.text_input("Nombre del Material")
                 rubro_sel = st.selectbox("Rubro", LISTA_RUBROS)
             with col2:
-                unidad = st.selectbox("Unidad", ["Bls","m3", "kg", "un", "lts", "m2", "gl", "barra","rollo","balde"])
+                unidad = st.selectbox("Unidad", ["m3", "kg", "un", "lts", "m2", "gl", "barra"])
                 costo = st.number_input("Costo Unitario ($)", min_value=0.0, step=0.1)
             
             if st.form_submit_button("Guardar Material"):
                 if n_mat:
-                    nuevo_id_m = 1 if df_mat.empty else int(df_mat['ID_MAT'].max()) + 1
-                    # IMPORTANTE: Asegúrate de que el orden coincida con las columnas en tu Sheet
-                    # Ejemplo: [ID_MAT, NOMBRE, UNIDAD, COSTO, RUBRO]
-                    nueva_fila_mat = [nuevo_id_m, n_mat, unidad, costo, rubro_sel]
+                    # Lógica de ID: Seguiremos guardando el NÚMERO puro en Google Sheets
+                    # pero lo calculamos para que sea único.
+                    nuevo_id_num = 1 if df_mat.empty else int(df_mat['ID_MAT'].max()) + 1
+                    
+                    # Guardamos la fila (Asegúrate que el orden coincida con tu GSheet)
+                    # Sugerencia de orden: [ID_MAT, NOMBRE, UNIDAD, COSTO, RUBRO]
+                    nueva_fila_mat = [nuevo_id_num, n_mat, unidad, costo, rubro_sel]
                     
                     try:
                         sh.get_worksheet_by_id(1931749204).append_row(nueva_fila_mat)
-                        st.success(f"✅ '{n_mat}' guardado en el rubro '{rubro_sel}'.")
+                        st.success(f"✅ Material '{n_mat}' guardado con ID #{nuevo_id_num}")
                         st.cache_data.clear()
                         st.rerun()
                     except Exception as e:
@@ -137,17 +138,23 @@ elif opcion == "📦 Gestionar Materiales":
                 else:
                     st.warning("El nombre del material es obligatorio.")
 
-    # Visualización con filtros por rubro
+    # Visualización con "Código Visual"
     if not df_mat.empty:
-        st.write("### Materiales Registrados")
+        st.write("### Inventario")
         
-        # Filtro rápido en la interfaz
-        rubro_filtro = st.multiselect("Filtrar por Rubro", df_mat['RUBRO'].unique(), default=df_mat['RUBRO'].unique())
-        df_filtrado = df_mat[df_mat['RUBRO'].isin(rubro_filtro)]
+        # Creamos una columna visual que combine Rubro + ID solo para mostrarla
+        # Esto no se guarda en el Excel, solo se ve en la web
+        df_visual = df_mat.copy()
+        df_visual['COD_VISUAL'] = df_visual.apply(
+            lambda x: f"{str(x['RUBRO'])[:3].upper()}-{str(x['ID_MAT']).zfill(3)}", axis=1
+        )
         
-        st.dataframe(df_filtrado, use_container_width=True, hide_index=True)
-    else:
-        st.info("El catálogo está vacío.")
+        # Reordenamos columnas para que el código visual esté primero
+        cols = ['COD_VISUAL', 'NOMBRE', 'RUBRO', 'UNIDAD', 'COSTO']
+        # Filtramos solo las que existen para evitar errores
+        cols_presentes = [c for c in cols if c in df_visual.columns]
+        
+        st.dataframe(df_visual[cols_presentes], use_container_width=True, hide_index=True)
 
 # --- MÓDULO 5: CONSOLIDADO FINAL ---
 elif opcion == "📊 Consolidado Final":
