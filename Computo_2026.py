@@ -4,10 +4,22 @@ import gspread
 from google.oauth2.service_account import Credentials
 
 # 1. Configuración de Conexión (Asegúrate de tener esto en Secrets)
+@st.cache_resource
 def get_gsheet_client():
-    scope = ["https://googleapis.com"]
-    # En Streamlit Cloud, pega el JSON en la sección Secrets
-    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
+    # Definimos los scopes explícitamente
+    scopes = [
+        "https://googleapis.com",
+        "https://googleapis.com"
+    ]
+    
+    # Extraemos la info de secrets
+    creds_dict = st.secrets["gcp_service_account"]
+    
+    # IMPORTANTE: Aseguramos que los saltos de línea de la clave privada estén bien
+    if "private_key" in creds_dict:
+        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+    
+    creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
     return gspread.authorize(creds)
 
 # 2. Definición de funciones ANTES de usarlas
