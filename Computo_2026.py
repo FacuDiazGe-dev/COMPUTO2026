@@ -9,7 +9,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from io import BytesIO
 from datetime import datetime
-
+from google.cloud import storage # Asegúrate de tener google-cloud-storage en requirements.txt
 # ---------------------------------------------------------
 # 1. CONFIGURACIÓN DE PÁGINA
 # ---------------------------------------------------------
@@ -527,29 +527,46 @@ elif seccion == "Gestión de Proyectos":
 # ---------------------------------------------------------
 # 9. FUNCIÓN DE SUBIDA A CLOUD STORAGE (REVISADA)
 # ---------------------------------------------------------
+
+
 def subir_a_gcs(buffer, nombre_archivo):
     try:
+        # 1. Validación de Secretos (Asegúrate de que la ruta coincida con tu secrets.toml)
+        if "connections" not in st.secrets or "gsheets" not in st.secrets.connections:
+            st.error("No se encontraron las credenciales en st.secrets['connections']['gsheets']")
+            return False
+
         creds_dict = dict(st.secrets.connections.gsheets)
-        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
         
-        storage_client = storage.Client.from_service_account_info(creds_dict)
+        # Limpieza de clave privada
+        if "private_key" in creds_dict:
+            creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
         
-        # Nombre de tu bucket verificado
+        # 2. Inicialización del cliente
+        # Es vital pasar el project ID explícitamente si el JSON es de una cuenta de servicio
+        client = storage.Client.from_service_account_info(creds_dict)
+        
+        # 3. Referencia al bucket (Verifica que el nombre sea exacto)
         nombre_bucket = "reportes-computo2026" 
-        bucket = storage_client.get_bucket(nombre_bucket) 
+        bucket = client.bucket(nombre_bucket)
         
+        # 4. Preparar el blob y subir
         blob = bucket.blob(f"historial/{nombre_archivo}")
         
-        # REINICIAR PUNTERO: Vital para que no suba un archivo vacío
+        # Reiniciar el puntero del buffer para asegurar que lea desde el principio
         buffer.seek(0)
         
-        # Subida como archivo binario
+        # Subida
         blob.upload_from_file(buffer, content_type='application/pdf')
         
+        st.success(f"Archivo {nombre_archivo} subido correctamente a GCS.")
         return True
+
     except Exception as e:
-        st.error(f"Error detallado en GCS: {e}")
+        # Esto imprimirá el error real en tu pantalla de Streamlit para debug
+        st.error(f"Error técnico al subir: {type(e).__name__}: {str(e)}")
         return False
+
 
 
 
