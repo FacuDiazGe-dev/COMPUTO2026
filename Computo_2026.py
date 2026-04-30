@@ -241,10 +241,25 @@ if seccion == "Inicio":
                     st.download_button("📥 Descargar Excel (CSV)", csv, f"Mat_{p_sel}.csv", "text/csv")
                 
                 with col_down2:
-                    # Pasamos el DataFrame ya procesado a la función del PDF
-                    # Nota: La función del PDF debe usar la columna 'Cantidad'
                     pdf_fp = generar_pdf_materiales(reporte_final, p_sel)
-                    st.download_button("📄 Descargar PDF Profesional", pdf_fp, f"Reporte_{p_sel}.pdf", "application/pdf")
+                    
+                    # Creamos un nombre de archivo único con fecha y hora
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+                    nombre_pdf = f"Reporte_{p_sel}_{timestamp}.pdf"
+                    
+                    # Botón de descarga normal
+                    descarga = st.download_button(
+                        label="📄 Generar y Descargar PDF",
+                        data=pdf_fp,
+                        file_name=nombre_pdf,
+                        mime="application/pdf"
+                    )
+                    
+                    # Si el usuario hace clic, se sube automáticamente
+                    if descarga:
+                        exito = subir_a_gcs(pdf_fp, nombre_pdf)
+                        if exito:
+                            st.toast("☁️ Copia guardada en la nube", icon="💾")
             else:
                 st.info("Este proyecto no tiene ítems con materiales.")
 
@@ -508,6 +523,26 @@ elif seccion == "Gestión de Proyectos":
                 st.info("Carga completada. Puedes ver el informe en la pestaña de Inicio.")
     else:
         st.warning("Aún no hay proyectos creados. Usa el formulario de arriba.")
+
+# ---------------------------------------------------------
+# 9. FUNCIÓN DE SUBIDA A CLOUD STORAGE
+# ---------------------------------------------------------
+def subir_a_gcs(buffer, nombre_archivo):
+    try:
+        # Usamos las mismas credenciales que ya tienes para GSheets
+        creds_dict = dict(st.secrets.connections.gsheets)
+        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+        
+        storage_client = storage.Client.from_service_account_info(creds_dict)
+        bucket = storage_client.bucket("TU_NOMBRE_DE_BUCKET") # <-- CAMBIA ESTO
+        
+        blob = bucket.blob(f"historial/{nombre_archivo}")
+        blob.upload_from_string(buffer.getvalue(), content_type='application/pdf')
+        return True
+    except Exception as e:
+        st.error(f"Error al subir a la nube: {e}")
+        return False
+
 
 
 
