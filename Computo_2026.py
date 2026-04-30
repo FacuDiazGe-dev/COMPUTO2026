@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import gspread
+import math
 from google.oauth2.service_account import Credentials
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -133,96 +134,84 @@ with st.sidebar:
     st.info("Sistema de Cómputo de Materiales v1.0")
 
 # ---------------------------------------------------------
-# 5. SECCIÓN: INICIO (CONDENSADOR Y REPORTES)
+# 5. SECCIÓN: INICIO (CONDENSADOR CON REDONDEO)
 # ---------------------------------------------------------
 if seccion == "Inicio":
     st.header("📊 Panel de Control y Reportes")
     
-    # 1. CARGA DE DATOS PARA EL CÁLCULO
-    df_proy_items = load_data(1900275728) # Proyectos_Items
-    df_recetas = load_data(1931749204)    # Recetas_Global
-    df_comp = load_data(50989702)         # Composicion_Recetas
-    df_mat = load_data(0)                 # Materiales_Global
+    # 1. CARGA DE DATOS
+    df_proy_items = load_data(1900275728)
+    df_comp = load_data(50989702)
+    df_mat = load_data(0)
 
     if not df_proy_items.empty:
-        # 5.a Tabla General de Proyectos (Resumen rápido)
         proyectos_unicos = df_proy_items[['ID_Proyecto', 'Nombre_Proyecto']].drop_duplicates()
-        proyectos_unicos = proyectos_unicos[proyectos_unicos['ID_Proyecto'] != ""] # Limpiar vacíos
+        proyectos_unicos = proyectos_unicos[proyectos_unicos['ID_Proyecto'] != ""]
         
         st.subheader("Proyectos en curso")
         st.dataframe(proyectos_unicos, use_container_width=True, hide_index=True)
-
         st.divider()
 
-        # 5.b LÓGICA DEL CONDENSADOR
         st.subheader("📦 Generar Listado de Materiales")
         p_sel = st.selectbox("Seleccione Proyecto para emitir listado:", proyectos_unicos['Nombre_Proyecto'])
 
         if p_sel:
-            # 1. Filtrar ítems asignados a este proyecto (quitar la fila "INICIO")
             items_obra = df_proy_items[(df_proy_items['Nombre_Proyecto'] == p_sel) & 
                                       (df_proy_items['ID_Receta'] != "INICIO")].copy()
             
             if not items_obra.empty and not df_comp.empty:
-                # Unificar tipos de datos para los MERGE
-                items_obra['ID_Receta'] = items_obra['ID_Receta'].astype(str)
-                df_comp['ID_Receta'] = df_comp['ID_Receta'].astype(str)
-                df_mat['ID_Material'] = df_mat['ID_Material'].astype(str)
-                df_comp['ID_Material'] = df_comp['ID_Material'].astype(str)
+                # UNIFICACIÓN DE TIPOS
+                for df in [items_obra, df_comp, df_mat]:
+                    if 'ID_Receta' in df.columns: df['ID_Receta'] = df['ID_Receta'].astype(str)
+                    if 'ID_Material' in df.columns: df['ID_Material'] = df['ID_Material'].astype(str)
 
-                # 2. CRUCE DE TABLAS
-                # Cruzamos items de obra con su composición (recetas)
+                # 2. CÁLCULOS
                 calculo = items_obra.merge(df_comp, on='ID_Receta')
-                
-                # Convertimos columnas a números
                 calculo['Computo'] = pd.to_numeric(calculo['Computo'], errors='coerce')
                 calculo['Cantidad_Unitaria'] = pd.to_numeric(calculo['Cantidad_Unitaria'], errors='coerce')
                 calculo['Factor'] = pd.to_numeric(calculo['Factor'], errors='coerce').fillna(1)
+                
+                calculo['Parcial'] = (calculo['Computo'] * calculo['Cantidad_Unitaria']) / calculo['Factor']
 
-                # 3. CÁLCULO MATEMÁTICO FINAL
-                calculo['Total_Necesario'] = (calculo['Computo'] * calculo['Cantidad_Unitaria']) / calculo['Factor']
-
-                # 4. TRAER NOMBRES Y RUBROS DE MATERIALES
+                # 3. CRUCE CON MAESTRO DE MATERIALES (Para traer Redondeo y Rubro)
                 reporte_detallado = calculo.merge(df_mat, on='ID_Material')
 
-                # 5. AGRUPAR (CONDENSAR) POR MATERIAL
-                # Esto suma el mismo material si aparece en diferentes ítems del proyecto
-                reporte_final = reporte_detallado.groupby(['Nombre', 'Unidad', 'Rubro_Default'])['Total_Necesario'].sum().reset_index()
-                
-                # Dar formato visual
-                reporte_final = reporte_final.rename(columns={
-                    'Nombre': 'Insumo',
-                    'Rubro_Default': 'Rubro',
-                    'Total_Necesario': 'Cantidad Total'
-                })
+                # 4. AGRUPAR TOTALES TEÓRICOS
+                reporte_final = reporte_detallado.groupby(['Nombre', 'Unidad', 'Rubro_Default', 'Redondeo'])['Parcial'].sum().reset_index()
 
-                # Ordenar por Rubro para que sea más legible
+                # 5. FUNCIÓN DE REDONDEO COMERCIAL
+                import math
+                def aplicar_redondeo(fila):
+                    valor = fila['Parcial']
+                    tipo = str(fila['Redondeo']).strip().capitalize()
+                    if tipo == 'Entero': return math.ceil(valor)
+                    elif tipo == 'Medio': return math.ceil(valor * 2) / 2
+                    else: return round(valor, 2)
+
+                # Ejecutamos el redondeo
+                reporte_final['Cantidad'] = reporte_final.apply(aplicar_redondeo, axis=1)
+
+                # Limpieza visual para la tabla
+                reporte_final = reporte_final.rename(columns={'Nombre': 'Insumo', 'Rubro_Default': 'Rubro'})
                 reporte_final = reporte_final.sort_values(by=['Rubro', 'Insumo'])
-
+                
                 # MOSTRAR EN PANTALLA
                 st.write(f"### Listado Consolidado: {p_sel}")
-                st.dataframe(reporte_final, use_container_width=True, hide_index=True)
+                st.dataframe(reporte_final[['Insumo', 'Cantidad', 'Unidad', 'Rubro']], use_container_width=True, hide_index=True)
                 
                 # 6. BOTONES DE DESCARGA
                 col_down1, col_down2 = st.columns(2)
-                
                 with col_down1:
                     csv = reporte_final.to_csv(index=False).encode('utf-8-sig')
                     st.download_button("📥 Descargar Excel (CSV)", csv, f"Mat_{p_sel}.csv", "text/csv")
                 
                 with col_down2:
-                    # Llamamos a nuestra nueva función PDF
+                    # Pasamos el DataFrame ya procesado a la función del PDF
+                    # Nota: La función del PDF debe usar la columna 'Cantidad'
                     pdf_fp = generar_pdf_materiales(reporte_final, p_sel)
-                    st.download_button(
-                        label="📄 Descargar PDF Profesional",
-                        data=pdf_fp,
-                        file_name=f"Reporte_Materiales_{p_sel}.pdf",
-                        mime="application/pdf"
-                    )
+                    st.download_button("📄 Descargar PDF Profesional", pdf_fp, f"Reporte_{p_sel}.pdf", "application/pdf")
             else:
-                st.info("Este proyecto aún no tiene ítems con materiales asignados.")
-    else:
-        st.info("No hay proyectos registrados. Ve a la pestaña 'Gestión de Proyectos' para empezar.")
+                st.info("Este proyecto no tiene ítems con materiales.")
 
 # ---------------------------------------------------------
 # 6. SECCIÓN: EDICIÓN DE BASES (MATERIALES Y RECETAS)
