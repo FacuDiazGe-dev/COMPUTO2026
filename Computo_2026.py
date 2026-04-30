@@ -407,6 +407,76 @@ elif seccion == "Gestión de Proyectos":
     else:
         st.warning("Aún no hay proyectos creados. Usa el formulario de arriba.")
 
+# ---------------------------------------------------------
+# 8. FUNCION GENERADORA DE PDF (REPORTLAB)
+# ---------------------------------------------------------
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+from io import BytesIO
+from datetime import datetime
+
+def generar_pdf_materiales(df_reporte, nombre_proyecto):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+    elementos = []
+    estilos = getSampleStyleSheet()
+
+    # --- ENCABEZADO ---
+    titulo_estilo = ParagraphStyle('Titulo', parent=estilos['Heading1'], alignment=1, fontSize=18, spaceAfter=20)
+    elementos.append(Paragraph(f"LISTADO DE MATERIALES", titulo_estilo))
+    
+    # Info del Proyecto
+    info_estilo = estilos["Normal"]
+    fecha_actual = datetime.now().strftime("%d/%m/%Y")
+    elementos.append(Paragraph(f"<b>PROYECTO:</b> {nombre_proyecto}", info_estilo))
+    elementos.append(Paragraph(f"<b>FECHA DE EMISIÓN:</b> {fecha_actual}", info_estilo))
+    elementos.append(Spacer(1, 20))
+
+    # --- TABLA POR RUBROS ---
+    # Agrupamos por rubro para crear sub-tablas
+    rubros = df_reporte['Rubro'].unique()
+    
+    for rubro in rubros:
+        # Sub-titulo del rubro
+        elementos.append(Paragraph(f"<b>RUBRO: {rubro.upper()}</b>", estilos['Heading3']))
+        elementos.append(Spacer(1, 5))
+        
+        # Filtrar materiales de este rubro
+        df_sub = df_reporte[df_reporte['Rubro'] == rubro][['Insumo', 'Cantidad Total', 'Unidad']]
+        
+        # Formatear números a 2 decimales para el PDF
+        df_sub['Cantidad Total'] = df_sub['Cantidad Total'].map('{:,.2f}'.format)
+        
+        # Convertir dataframe a lista para la tabla de ReportLab
+        data = [["Insumo", "Cantidad", "Unidad"]] + df_sub.values.tolist()
+        
+        t = Table(data, colWidths=[280, 80, 80])
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'), # Cantidades a la derecha
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        elementos.append(t)
+        elementos.append(Spacer(1, 15))
+
+    # --- PIE DE PÁGINA ---
+    elementos.append(Spacer(1, 30))
+    elementos.append(Paragraph("<i>Nota: Cantidades teóricas sujetas a desperdicios de obra.</i>", estilos['Italic']))
+
+    doc.build(elementos)
+    buffer.seek(0)
+    return buffer
+
+
 
 
 # ---------------------------------------------------------
