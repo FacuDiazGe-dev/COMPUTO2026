@@ -74,22 +74,19 @@ def generar_pdf_materiales(df_reporte, nombre_proyecto):
     elementos.append(Spacer(1, 20))
 
     # Agrupamos por Rubro
-    # Usamos 'Rubro' porque así lo renombramos en el reporte_final
     rubros = df_reporte['Rubro'].unique()
     
     for rubro in rubros:
         elementos.append(Paragraph(f"<b>RUBRO: {str(rubro).upper()}</b>", estilos['Heading3']))
         elementos.append(Spacer(1, 5))
         
-        # Filtramos datos (IMPORTANTE: Usamos 'Insumo' y 'Cantidad' que son los nuevos nombres)
+        # Filtramos datos
         df_sub = df_reporte[df_reporte['Rubro'] == rubro][['Insumo', 'Cantidad', 'Unidad']]
-        
-        # Formateamos números a 2 decimales para que no salgan con muchos ceros
         df_sub['Cantidad'] = df_sub['Cantidad'].map('{:,.2f}'.format)
         
-        # Estructura de la tabla: Insumo (280px), Cantidad (80px), Unidad (80px)
+        # --- AQUÍ ESTABA EL ERROR: Definimos anchos fijos ---
         data = [["Insumo", "Cantidad", "Unidad"]] + df_sub.values.tolist()
-        t = Table(data, colWidths=)
+        t = Table(data, colWidths=[280, 80, 80]) 
         
         t.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#2E4053")),
@@ -111,6 +108,7 @@ def generar_pdf_materiales(df_reporte, nombre_proyecto):
     doc.build(elementos)
     buffer.seek(0)
     return buffer
+
     
     # --- TABLA POR RUBROS ---
     # Agrupamos por rubro para crear sub-tablas
