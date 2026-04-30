@@ -168,6 +168,49 @@ with st.sidebar:
         st.rerun()
     st.info("Sistema de Cómputo de Materiales v1.0")
 
+
+# ---------------------------------------------------------
+# 9. FUNCIÓN DE SUBIDA A CLOUD STORAGE (REVISADA)
+# ---------------------------------------------------------
+
+def subir_a_gcs(buffer, nombre_archivo):
+    try:
+        # 1. Validación de Secretos (Asegúrate de que la ruta coincida con tu secrets.toml)
+        if "connections" not in st.secrets or "gsheets" not in st.secrets.connections:
+            st.error("No se encontraron las credenciales en st.secrets['connections']['gsheets']")
+            return False
+
+        creds_dict = dict(st.secrets.connections.gsheets)
+        
+        # Limpieza de clave privada
+        if "private_key" in creds_dict:
+            creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+        
+        # 2. Inicialización del cliente
+        # Es vital pasar el project ID explícitamente si el JSON es de una cuenta de servicio
+        client = storage.Client.from_service_account_info(creds_dict)
+        
+        # 3. Referencia al bucket (Verifica que el nombre sea exacto)
+        nombre_bucket = "reportes-computo2026" 
+        bucket = client.bucket(nombre_bucket)
+        
+        # 4. Preparar el blob y subir
+        blob = bucket.blob(f"historial/{nombre_archivo}")
+        
+        # Reiniciar el puntero del buffer para asegurar que lea desde el principio
+        buffer.seek(0)
+        
+        # Subida
+        blob.upload_from_file(buffer, content_type='application/pdf')
+        
+        st.success(f"Archivo {nombre_archivo} subido correctamente a GCS.")
+        return True
+
+    except Exception as e:
+        # Esto imprimirá el error real en tu pantalla de Streamlit para debug
+        st.error(f"Error técnico al subir: {type(e).__name__}: {str(e)}")
+        return False
+
 # ---------------------------------------------------------
 # 5. SECCIÓN: INICIO (CONDENSADOR CON REDONDEO Y NUBE)
 # ---------------------------------------------------------
@@ -266,146 +309,8 @@ if seccion == "Inicio":
     else:
         st.info("No hay proyectos registrados. Ve a la pestaña 'Gestión de Proyectos' para empezar.")
 
-# ---------------------------------------------------------
-# 9. FUNCIÓN DE SUBIDA A CLOUD STORAGE (REVISADA)
-# ---------------------------------------------------------
 
-def subir_a_gcs(buffer, nombre_archivo):
-    try:
-        # 1. Validación de Secretos (Asegúrate de que la ruta coincida con tu secrets.toml)
-        if "connections" not in st.secrets or "gsheets" not in st.secrets.connections:
-            st.error("No se encontraron las credenciales en st.secrets['connections']['gsheets']")
-            return False
-
-        creds_dict = dict(st.secrets.connections.gsheets)
-        
-        # Limpieza de clave privada
-        if "private_key" in creds_dict:
-            creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-        
-        # 2. Inicialización del cliente
-        # Es vital pasar el project ID explícitamente si el JSON es de una cuenta de servicio
-        client = storage.Client.from_service_account_info(creds_dict)
-        
-        # 3. Referencia al bucket (Verifica que el nombre sea exacto)
-        nombre_bucket = "reportes-computo2026" 
-        bucket = client.bucket(nombre_bucket)
-        
-        # 4. Preparar el blob y subir
-        blob = bucket.blob(f"historial/{nombre_archivo}")
-        
-        # Reiniciar el puntero del buffer para asegurar que lea desde el principio
-        buffer.seek(0)
-        
-        # Subida
-        blob.upload_from_file(buffer, content_type='application/pdf')
-        
-        st.success(f"Archivo {nombre_archivo} subido correctamente a GCS.")
-        return True
-
-    except Exception as e:
-        # Esto imprimirá el error real en tu pantalla de Streamlit para debug
-        st.error(f"Error técnico al subir: {type(e).__name__}: {str(e)}")
-        return False
-
-
-
-# ---------------------------------------------------------
-# 5. SECCIÓN: INICIO (CONDENSADOR CON REDONDEO)
-# ---------------------------------------------------------
-if seccion == "Inicio":
-    st.header("📊 Panel de Control y Reportes")
-    
-    # 1. CARGA DE DATOS
-    df_proy_items = load_data(1900275728)
-    df_comp = load_data(50989702)
-    df_mat = load_data(0)
-
-    if not df_proy_items.empty:
-        proyectos_unicos = df_proy_items[['ID_Proyecto', 'Nombre_Proyecto']].drop_duplicates()
-        proyectos_unicos = proyectos_unicos[proyectos_unicos['ID_Proyecto'] != ""]
-        
-        st.subheader("Proyectos en curso")
-        st.dataframe(proyectos_unicos, use_container_width=True, hide_index=True)
-        st.divider()
-
-        st.subheader("📦 Generar Listado de Materiales")
-        p_sel = st.selectbox("Seleccione Proyecto para emitir listado:", proyectos_unicos['Nombre_Proyecto'])
-
-        if p_sel:
-            items_obra = df_proy_items[(df_proy_items['Nombre_Proyecto'] == p_sel) & 
-                                      (df_proy_items['ID_Receta'] != "INICIO")].copy()
-            
-            if not items_obra.empty and not df_comp.empty:
-                # UNIFICACIÓN DE TIPOS
-                for df in [items_obra, df_comp, df_mat]:
-                    if 'ID_Receta' in df.columns: df['ID_Receta'] = df['ID_Receta'].astype(str)
-                    if 'ID_Material' in df.columns: df['ID_Material'] = df['ID_Material'].astype(str)
-
-                # 2. CÁLCULOS
-                calculo = items_obra.merge(df_comp, on='ID_Receta')
-                calculo['Computo'] = pd.to_numeric(calculo['Computo'], errors='coerce')
-                calculo['Cantidad_Unitaria'] = pd.to_numeric(calculo['Cantidad_Unitaria'], errors='coerce')
-                calculo['Factor'] = pd.to_numeric(calculo['Factor'], errors='coerce').fillna(1)
-                
-                calculo['Parcial'] = (calculo['Computo'] * calculo['Cantidad_Unitaria']) / calculo['Factor']
-
-                # 3. CRUCE CON MAESTRO DE MATERIALES (Para traer Redondeo y Rubro)
-                reporte_detallado = calculo.merge(df_mat, on='ID_Material')
-
-                # 4. AGRUPAR TOTALES TEÓRICOS
-                reporte_final = reporte_detallado.groupby(['Nombre', 'Unidad', 'Rubro_Default', 'Redondeo'])['Parcial'].sum().reset_index()
-
-                # 5. FUNCIÓN DE REDONDEO COMERCIAL
-                import math
-                def aplicar_redondeo(fila):
-                    valor = fila['Parcial']
-                    tipo = str(fila['Redondeo']).strip().capitalize()
-                    if tipo == 'Entero': return math.ceil(valor)
-                    elif tipo == 'Medio': return math.ceil(valor * 2) / 2
-                    else: return round(valor, 2)
-
-                # Ejecutamos el redondeo
-                reporte_final['Cantidad'] = reporte_final.apply(aplicar_redondeo, axis=1)
-
-                # Limpieza visual para la tabla
-                reporte_final = reporte_final.rename(columns={'Nombre': 'Insumo', 'Rubro_Default': 'Rubro'})
-                reporte_final = reporte_final.sort_values(by=['Rubro', 'Insumo'])
-                
-                # MOSTRAR EN PANTALLA
-                st.write(f"### Listado Consolidado: {p_sel}")
-                st.dataframe(reporte_final[['Insumo', 'Cantidad', 'Unidad', 'Rubro']], use_container_width=True, hide_index=True)
-                
-                # 6. BOTONES DE DESCARGA
-                col_down1, col_down2 = st.columns(2)
-                with col_down1:
-                    csv = reporte_final.to_csv(index=False).encode('utf-8-sig')
-                    st.download_button("📥 Descargar Excel (CSV)", csv, f"Mat_{p_sel}.csv", "text/csv")
-                
-                with col_down2:
-                    pdf_fp = generar_pdf_materiales(reporte_final, p_sel)
-                    
-                    # Creamos un nombre de archivo único con fecha y hora
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-                    nombre_pdf = f"Reporte_{p_sel}_{timestamp}.pdf"
-                    
-                    # Botón de descarga normal
-                    descarga = st.download_button(
-                        label="📄 Generar y Descargar PDF",
-                        data=pdf_fp,
-                        file_name=nombre_pdf,
-                        mime="application/pdf"
-                    )
-                    
-                    # Si el usuario hace clic, se sube automáticamente
-                    if descarga:
-                        exito = subir_a_gcs(pdf_fp, nombre_pdf)
-                        if exito:
-                            st.toast("☁️ Copia guardada en la nube", icon="💾")
-            else:
-                st.info("Este proyecto no tiene ítems con materiales.")
-
-# ---------------------------------------------------------
+#---------------------------------------------------------
 # 6. SECCIÓN: EDICIÓN DE BASES (MATERIALES Y RECETAS)
 # ---------------------------------------------------------
 elif seccion == "Edición de Bases":
