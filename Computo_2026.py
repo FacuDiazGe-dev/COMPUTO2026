@@ -55,26 +55,63 @@ def load_data(gid):
 
 
 # ---------------------------------------------------------
-# 8. FUNCION GENERADORA DE PDF (REPORTLAB)
+# 8. FUNCIÓN GENERADORA DE PDF (CORREGIDA)
 # ---------------------------------------------------------
-
 def generar_pdf_materiales(df_reporte, nombre_proyecto):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
     elementos = []
     estilos = getSampleStyleSheet()
 
-    # --- ENCABEZADO ---
+    # Estilo de Título
     titulo_estilo = ParagraphStyle('Titulo', parent=estilos['Heading1'], alignment=1, fontSize=18, spaceAfter=20)
     elementos.append(Paragraph(f"LISTADO DE MATERIALES", titulo_estilo))
     
     # Info del Proyecto
-    info_estilo = estilos["Normal"]
     fecha_actual = datetime.now().strftime("%d/%m/%Y")
-    elementos.append(Paragraph(f"<b>PROYECTO:</b> {nombre_proyecto}", info_estilo))
-    elementos.append(Paragraph(f"<b>FECHA DE EMISIÓN:</b> {fecha_actual}", info_estilo))
+    elementos.append(Paragraph(f"<b>PROYECTO:</b> {nombre_proyecto}", estilos["Normal"]))
+    elementos.append(Paragraph(f"<b>FECHA DE EMISIÓN:</b> {fecha_actual}", estilos["Normal"]))
     elementos.append(Spacer(1, 20))
 
+    # Agrupamos por Rubro
+    # Usamos 'Rubro' porque así lo renombramos en el reporte_final
+    rubros = df_reporte['Rubro'].unique()
+    
+    for rubro in rubros:
+        elementos.append(Paragraph(f"<b>RUBRO: {str(rubro).upper()}</b>", estilos['Heading3']))
+        elementos.append(Spacer(1, 5))
+        
+        # Filtramos datos (IMPORTANTE: Usamos 'Insumo' y 'Cantidad' que son los nuevos nombres)
+        df_sub = df_reporte[df_reporte['Rubro'] == rubro][['Insumo', 'Cantidad', 'Unidad']]
+        
+        # Formateamos números a 2 decimales para que no salgan con muchos ceros
+        df_sub['Cantidad'] = df_sub['Cantidad'].map('{:,.2f}'.format)
+        
+        # Estructura de la tabla: Insumo (280px), Cantidad (80px), Unidad (80px)
+        data = [["Insumo", "Cantidad", "Unidad"]] + df_sub.values.tolist()
+        t = Table(data, colWidths=)
+        
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#2E4053")),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'), 
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        elementos.append(t)
+        elementos.append(Spacer(1, 15))
+
+    elementos.append(Spacer(1, 30))
+    elementos.append(Paragraph("<i>Nota: Cantidades redondeadas según criterio comercial. Sujeto a desperdicios de obra.</i>", estilos['Italic']))
+
+    doc.build(elementos)
+    buffer.seek(0)
+    return buffer
+    
     # --- TABLA POR RUBROS ---
     # Agrupamos por rubro para crear sub-tablas
     rubros = df_reporte['Rubro'].unique()
