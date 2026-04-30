@@ -2,3 +2,4 @@ streamlit
 pandas
 st-gsheets-connection
 reportlab
+from google.cloud import storage
