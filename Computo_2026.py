@@ -525,24 +525,31 @@ elif seccion == "Gestión de Proyectos":
         st.warning("Aún no hay proyectos creados. Usa el formulario de arriba.")
 
 # ---------------------------------------------------------
-# 9. FUNCIÓN DE SUBIDA A CLOUD STORAGE
+# 9. FUNCIÓN DE SUBIDA A CLOUD STORAGE (REVISADA)
 # ---------------------------------------------------------
 def subir_a_gcs(buffer, nombre_archivo):
     try:
-        # Usamos las mismas credenciales que ya tienes para GSheets
         creds_dict = dict(st.secrets.connections.gsheets)
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
         
         storage_client = storage.Client.from_service_account_info(creds_dict)
-        bucket = storage_client.bucket("TU_NOMBRE_DE_BUCKET") # <-- CAMBIA ESTO
+        
+        # Nombre de tu bucket verificado
+        nombre_bucket = "reportes-computo2026" 
+        bucket = storage_client.get_bucket(nombre_bucket) 
         
         blob = bucket.blob(f"historial/{nombre_archivo}")
-        blob.upload_from_string(buffer.getvalue(), content_type='application/pdf')
+        
+        # REINICIAR PUNTERO: Vital para que no suba un archivo vacío
+        buffer.seek(0)
+        
+        # Subida como archivo binario
+        blob.upload_from_file(buffer, content_type='application/pdf')
+        
         return True
     except Exception as e:
-        st.error(f"Error al subir a la nube: {e}")
+        st.error(f"Error detallado en GCS: {e}")
         return False
-
 
 
 
