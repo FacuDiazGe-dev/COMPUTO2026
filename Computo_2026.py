@@ -132,15 +132,23 @@ if seccion == "Inicio":
                 # MOSTRAR EN PANTALLA
                 st.write(f"### Listado Consolidado: {p_sel}")
                 st.dataframe(reporte_final, use_container_width=True, hide_index=True)
-
-                # 6. BOTÓN DE DESCARGA (Formato CSV compatible con Excel)
-                csv = reporte_final.to_csv(index=False).encode('utf-8-sig') # utf-8-sig para tildes en Excel
-                st.download_button(
-                    label="📥 Descargar Listado (Excel/CSV)",
-                    data=csv,
-                    file_name=f"Materiales_{p_sel}.csv",
-                    mime="text/csv",
-                )
+                
+                # 6. BOTONES DE DESCARGA
+                col_down1, col_down2 = st.columns(2)
+                
+                with col_down1:
+                    csv = reporte_final.to_csv(index=False).encode('utf-8-sig')
+                    st.download_button("📥 Descargar Excel (CSV)", csv, f"Mat_{p_sel}.csv", "text/csv")
+                
+                with col_down2:
+                    # Llamamos a nuestra nueva función PDF
+                    pdf_fp = generar_pdf_materiales(reporte_final, p_sel)
+                    st.download_button(
+                        label="📄 Descargar PDF Profesional",
+                        data=pdf_fp,
+                        file_name=f"Reporte_Materiales_{p_sel}.pdf",
+                        mime="application/pdf"
+                    )
             else:
                 st.info("Este proyecto aún no tiene ítems con materiales asignados.")
     else:
